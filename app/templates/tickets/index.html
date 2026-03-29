@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}Tickets - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-ticket-detailed me-2"></i>Tickets</h1>
+    <a href="{{ url_for('tickets.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus me-1"></i>New Ticket
+    </a>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-2">
+                {{ form.status(class="form-select") }}
+            </div>
+            <div class="col-md-2">
+                {{ form.priority(class="form-select") }}
+            </div>
+            <div class="col-md-2">
+                {{ form.category(class="form-select") }}
+            </div>
+            <div class="col-md-2">
+                {{ form.assigned_to(class="form-select") }}
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('tickets.index') }}" class="btn btn-secondary w-100">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Ticket #</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Priority</th>
+                    <th>Status</th>
+                    <th>Assigned To</th>
+                    <th>Created</th>
+                    <th>SLA</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ticket in tickets %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a>
+                    </td>
+                    <td>{{ ticket.title[:50] }}{% if ticket.title|length > 50 %}...{% endif %}</td>
+                    <td>{{ ticket.type }}</td>
+                    <td>{{ ticket.category or '-' }}</td>
+                    <td>
+                        <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
+                            {{ ticket.priority }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
+                            {{ ticket.status }}
+                        </span>
+                    </td>
+                    <td>{{ ticket.assignee.full_name if ticket.assignee else '-' }}</td>
+                    <td>{{ ticket.created_at.strftime('%m/%d %H:%M') }}</td>
+                    <td>
+                        {% if ticket.is_sla_breached %}
+                        <span class="badge bg-danger">Breached</span>
+                        {% elif ticket.sla_deadline %}
+                        <small class="text-{{ 'danger' if (ticket.sla_deadline - now()).total_seconds() < 3600 else 'muted' }}">
+                            {{ ticket.sla_deadline.strftime('%m/%d %H:%M') }}
+                        </small>
+                        {% else %}
+                        -
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not tickets %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-inbox" style="font-size: 3rem;"></i>
+            <p class="mt-2">No tickets found</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

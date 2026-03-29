@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block title %}Assets - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-pc me-2"></i>Asset Management</h1>
+    <a href="{{ url_for('assets.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus me-1"></i>Add Asset
+    </a>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Serial Number</th>
+                    <th>Assigned To</th>
+                    <th>Location</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asset in assets %}
+                <tr>
+                    <td>
+                        <a href="{{ url_for('assets.view', asset_id=asset.id) }}">{{ asset.name }}</a>
+                    </td>
+                    <td>{{ asset.asset_type }}</td>
+                    <td>{{ asset.serial_number or '-' }}</td>
+                    <td>{{ asset.owner.full_name if asset.owner else '-' }}</td>
+                    <td>{{ asset.location or '-' }}</td>
+                    <td>
+                        <span class="badge bg-{{ 'success' if asset.status == 'active' else 'warning' if asset.status == 'maintenance' else 'secondary' }}">
+                            {{ asset.status }}
+                        </span>
+                    </td>
+                    <td>
+                        <a href="{{ url_for('assets.view', asset_id=asset.id) }}" class="btn btn-sm btn-outline-primary">
+                            <i class="bi bi-eye"></i>
+                        </a>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+        
+        {% if not assets %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-pc" style="font-size: 3rem;"></i>
+            <p class="mt-2">No assets found</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

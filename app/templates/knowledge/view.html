@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+
+{% block title %}{{ article.title }} - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="h4">{{ article.title }}</h1>
+        <p class="text-muted mb-0">
+            <span class="badge bg-secondary">{{ article.category }}</span>
+            {% if article.tags %}
+                {% for tag in article.tags %}
+                <span class="badge bg-light text-dark">{{ tag }}</span>
+                {% endfor %}
+            {% endif %}
+        </p>
+    </div>
+    {% if current_user.is_agent() %}
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('knowledge.edit', article_id=article.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div style="white-space: pre-wrap;">{{ article.content }}</div>
+    </div>
+    <div class="card-footer text-muted">
+        <small>
+            <i class="bi bi-person me-1"></i>{{ article.author.full_name }}
+            <span class="mx-2">|</span>
+            <i class="bi bi-clock me-1"></i>Updated {{ article.updated_at.strftime('%m/%d/%Y %H:%M') }}
+            <span class="mx-2">|</span>
+            <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
+            <span class="mx-2">|</span>
+            <i class="bi bi-hand-thumbs-up me-1"></i>{{ article.helpful_count }} found helpful
+        </small>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Was this article helpful?</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('knowledge.helpful', article_id=article.id) }}">
+            <button type="submit" class="btn btn-outline-success">
+                <i class="bi bi-hand-thumbs-up me-1"></i>Yes, it helped
+            </button>
+        </form>
+    </div>
+</div>
+
+{% if related %}
+<div class="mt-4">
+    <h5>Related Articles</h5>
+    <div class="row">
+        {% for a in related %}
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h6><a href="{{ url_for('knowledge.view', article_id=a.id) }}">{{ a.title }}</a></h6>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+{% endblock %}

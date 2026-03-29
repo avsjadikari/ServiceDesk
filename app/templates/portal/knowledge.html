@@ -1,0 +1,64 @@
+{% extends "portal/base.html" %}
+
+{% block title %}Knowledge Base - {{ company_name }} Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-book me-2"></i>Knowledge Base</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-7">
+                <input type="text" name="search" class="form-control" placeholder="Search articles..." value="{{ request.args.get('search', '') }}">
+            </div>
+            <div class="col-md-3">
+                <select name="category" class="form-select">
+                    <option value="">All Categories</option>
+                    <option value="Hardware">Hardware</option>
+                    <option value="Software">Software</option>
+                    <option value="Network">Network</option>
+                    <option value="Security">Security</option>
+                    <option value="Email">Email</option>
+                    <option value="Account/Access">Account/Access</option>
+                    <option value="Application">Application</option>
+                    <option value="Database">Database</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    {% for article in articles %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="{{ url_for('portal.knowledge_view', article_id=article.id) }}">{{ article.title }}</a>
+                </h5>
+                <p class="card-text text-muted">{{ article.content[:150] }}...</p>
+                <span class="badge bg-secondary">{{ article.category }}</span>
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not articles %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-book" style="font-size: 3rem;"></i>
+    <p class="mt-2">No articles found</p>
+</div>
+{% endif %}
+{% endblock %}

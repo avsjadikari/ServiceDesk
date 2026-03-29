@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block title %}Ticket {{ ticket.ticket_number }} - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="h4">{{ ticket.ticket_number }}</h1>
+        <p class="text-muted mb-0">{{ ticket.title }}</p>
+    </div>
+    <div class="d-flex gap-2">
+        {% if current_user.is_agent() %}
+        <a href="{{ url_for('tickets.edit', ticket_id=ticket.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Description</h5>
+            </div>
+            <div class="card-body">
+                <p style="white-space: pre-wrap;">{{ ticket.description }}</p>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Comments</h5>
+            </div>
+            <div class="card-body">
+                {% for comment in comments %}
+                <div class="border-bottom pb-3 mb-3 {% if comment.is_internal %}bg-light p-2 rounded{% endif %}">
+                    <div class="d-flex justify-content-between">
+                        <strong>{{ comment.user.full_name }}</strong>
+                        <small class="text-muted">{{ comment.created_at.strftime('%m/%d/%Y %H:%M') }}</small>
+                    </div>
+                    {% if comment.is_internal %}
+                    <span class="badge bg-warning mb-2">Internal Note</span>
+                    {% endif %}
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ comment.content }}</p>
+                </div>
+                {% endfor %}
+                
+                {% if not comments %}
+                <p class="text-muted text-center">No comments yet</p>
+                {% endif %}
+            </div>
+            
+            <div class="card-body border-top">
+                <form method="POST" action="{{ url_for('tickets.add_comment', ticket_id=ticket.id) }}">
+                    {{ comment_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ comment_form.content(class="form-control", rows="3", placeholder="Add a comment...") }}
+                    </div>
+                    {% if current_user.is_agent() %}
+                    <div class="form-check mb-3">
+                        {{ comment_form.is_internal(class="form-check-input") }}
+                        {{ comment_form.is_internal.label(class="form-check-label") }}
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary">Add Comment</button>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Details</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td><strong>Type</strong></td>
+                        <td>{{ ticket.type }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status</strong></td>
+                        <td>
+                            {% if current_user.is_agent() %}
+                            <form method="POST" action="{{ url_for('tickets.update_status', ticket_id=ticket.id) }}" class="d-inline">
+                                <select name="status" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
+                                    <option value="new" {% if ticket.status == 'new' %}selected{% endif %}>New</option>
+                                    <option value="assigned" {% if ticket.status == 'assigned' %}selected{% endif %}>Assigned</option>
+                                    <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                                    <option value="pending" {% if ticket.status == 'pending' %}selected{% endif %}>Pending</option>
+                                    <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
+                                    <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+                                </select>
+                            </form>
+                            {% else %}
+                            <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
+                                {{ ticket.status }}
+                            </span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Priority</strong></td>
+                        <td>
+                            <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
+                                {{ ticket.priority }}
+                            </span>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Category</strong></td>
+                        <td>{{ ticket.category or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Created By</strong></td>
+                        <td>{{ ticket.creator.full_name if ticket.creator else '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Assigned To</strong></td>
+                        <td>
+                            {% if current_user.is_agent() and ticket.status != 'closed' %}
+                            <form method="POST" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}" class="d-inline">
+                                <select name="assigned_to" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
+                                    <option value="">Unassigned</option>
+                                    {% for user in users %}
+                                    <option value="{{ user.id }}" {% if ticket.assigned_to == user.id %}selected{% endif %}>{{ user.full_name }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
+                            {{ ticket.assignee.full_name if ticket.assignee else '-' }}
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td><strong>Created</strong></td>
+                        <td>{{ ticket.created_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                    </tr>
+                    {% if ticket.first_response_at %}
+                    <tr>
+                        <td><strong>First Response</strong></td>
+                        <td>{{ ticket.first_response_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if ticket.resolved_at %}
+                    <tr>
+                        <td><strong>Resolved</strong></td>
+                        <td>{{ ticket.resolved_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if ticket.sla_deadline %}
+                    <tr>
+                        <td><strong>SLA Deadline</strong></td>
+                        <td class="{% if ticket.is_sla_breached %}text-danger{% endif %}">
+                            {{ ticket.sla_deadline.strftime('%m/%d/%Y %H:%M') }}
+                            {% if ticket.is_sla_breached %}
+                            <span class="badge bg-danger">Breached</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        
+        {% if ticket.asset %}
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Linked Asset</h5>
+            </div>
+            <div class="card-body">
+                <p class="mb-1"><strong>{{ ticket.asset.name }}</strong></p>
+                <p class="text-muted mb-0">{{ ticket.asset.asset_type }} - {{ ticket.asset.serial_number }}</p>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

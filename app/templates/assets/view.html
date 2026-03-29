@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+
+{% block title %}{{ asset.name }} - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <div>
+        <h1 class="h4">{{ asset.name }}</h1>
+        <p class="text-muted mb-0">{{ asset.asset_type }} - {{ asset.serial_number }}</p>
+    </div>
+    {% if current_user.is_agent() %}
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('assets.edit', asset_id=asset.id) }}" class="btn btn-outline-primary">
+            <i class="bi bi-pencil me-1"></i>Edit
+        </a>
+    </div>
+    {% endif %}
+</div>
+
+<div class="row">
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Asset Details</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <tr>
+                        <td><strong>Type</strong></td>
+                        <td>{{ asset.asset_type }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Model</strong></td>
+                        <td>{{ asset.model or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Manufacturer</strong></td>
+                        <td>{{ asset.manufacturer or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Serial Number</strong></td>
+                        <td>{{ asset.serial_number or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Location</strong></td>
+                        <td>{{ asset.location or '-' }}</td>
+                    </tr>
+                    <tr>
+                        <td><strong>Status</strong></td>
+                        <td>
+                            <span class="badge bg-{{ 'success' if asset.status == 'active' else 'warning' if asset.status == 'maintenance' else 'secondary' }}">
+                                {{ asset.status }}
+                            </span>
+                        </td>
+                    </tr>
+                    {% if asset.purchase_date %}
+                    <tr>
+                        <td><strong>Purchase Date</strong></td>
+                        <td>{{ asset.purchase_date.strftime('%m/%d/%Y') }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if asset.warranty_expiry %}
+                    <tr>
+                        <td><strong>Warranty Expiry</strong></td>
+                        <td class="{{ 'text-danger' if asset.warranty_expiry.strftime('%Y-%m-%d') < 'now'|string else '' }}">
+                            {{ asset.warranty_expiry.strftime('%m/%d/%Y') }}
+                        </td>
+                    </tr>
+                    {% endif %}
+                    {% if asset.notes %}
+                    <tr>
+                        <td><strong>Notes</strong></td>
+                        <td>{{ asset.notes }}</td>
+                    </tr>
+                    {% endif %}
+                </table>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Related Tickets</h5>
+            </div>
+            <div class="card-body">
+                {% if asset.tickets.count() > 0 %}
+                <table class="table table-sm">
+                    <thead>
+                        <tr>
+                            <th>Ticket</th>
+                            <th>Title</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for ticket in asset.tickets.all() %}
+                        <tr>
+                            <td><a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a></td>
+                            <td>{{ ticket.title[:40] }}...</td>
+                            <td>{{ ticket.status }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted mb-0">No related tickets</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Assignment</h5>
+            </div>
+            <div class="card-body">
+                {% if asset.owner %}
+                <p><strong>{{ asset.owner.full_name }}</strong></p>
+                <p class="text-muted">{{ asset.owner.department or '' }}</p>
+                <p class="text-muted">{{ asset.owner.email }}</p>
+                {% else %}
+                <p class="text-muted">Not assigned</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

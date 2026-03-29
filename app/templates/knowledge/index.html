@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Knowledge Base - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-book me-2"></i>Knowledge Base</h1>
+    {% if current_user.is_agent() %}
+    <a href="{{ url_for('knowledge.new') }}" class="btn btn-primary">
+        <i class="bi bi-plus me-1"></i>New Article
+    </a>
+    {% endif %}
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <form method="GET" class="row g-3">
+            <div class="col-md-5">
+                {{ form.search(class="form-control", placeholder="Search articles...") }}
+            </div>
+            <div class="col-md-3">
+                {{ form.category(class="form-select") }}
+            </div>
+            <div class="col-md-2">
+                <button type="submit" class="btn btn-primary w-100">Search</button>
+            </div>
+            <div class="col-md-2">
+                <a href="{{ url_for('knowledge.index') }}" class="btn btn-secondary w-100">Clear</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="row">
+    {% for article in articles %}
+    <div class="col-md-6 mb-4">
+        <div class="card h-100">
+            <div class="card-body">
+                <h5 class="card-title">
+                    <a href="{{ url_for('knowledge.view', article_id=article.id) }}">{{ article.title }}</a>
+                </h5>
+                <p class="card-text text-muted">{{ article.content[:150] }}...</p>
+                <div class="d-flex gap-2">
+                    <span class="badge bg-secondary">{{ article.category }}</span>
+                    {% if article.tags %}
+                        {% for tag in article.tags[:3] %}
+                        <span class="badge bg-light text-dark">{{ tag }}</span>
+                        {% endfor %}
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-footer text-muted">
+                <small>
+                    <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
+                    <span class="mx-2">|</span>
+                    <i class="bi bi-clock me-1"></i>{{ article.updated_at.strftime('%m/%d/%Y') }}
+                </small>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% if not articles %}
+<div class="text-center py-5 text-muted">
+    <i class="bi bi-book" style="font-size: 3rem;"></i>
+    <p class="mt-2">No articles found</p>
+</div>
+{% endif %}
+{% endblock %}

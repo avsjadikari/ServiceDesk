@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-graph-up me-2"></i>Analytics Dashboard</h1>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card metric-card">
+            <div class="card-body">
+                <p class="text-muted mb-0">Total Tickets</p>
+                <h2>{{ metrics.total }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card warning">
+            <div class="card-body">
+                <p class="text-muted mb-0">Open Tickets</p>
+                <h2>{{ metrics.open }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card success">
+            <div class="card-body">
+                <p class="text-muted mb-0">Resolved</p>
+                <h2>{{ metrics.resolved }}</h2>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card metric-card {% if sla.compliance_rate < 80 %}danger{% else %}success{% endif %}">
+            <div class="card-body">
+                <p class="text-muted mb-0">SLA Compliance</p>
+                <h2>{{ sla.compliance_rate }}%</h2>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mb-4">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Tickets by Status</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="statusChart"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Tickets by Priority</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="priorityChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-md-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0">Agent Performance</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Agent</th>
+                            <th>Department</th>
+                            <th>Assigned</th>
+                            <th>Resolved</th>
+                            <th>Avg Resolution (hrs)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for p in performance %}
+                        <tr>
+                            <td>{{ p.agent.full_name }}</td>
+                            <td>{{ p.agent.department or '-' }}</td>
+                            <td>{{ p.assigned }}</td>
+                            <td>{{ p.resolved }}</td>
+                            <td>{{ "%.1f"|format(p.avg_resolution_hours) }}</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script>
+    const statusCtx = document.getElementById('statusChart').getContext('2d');
+    new Chart(statusCtx, {
+        type: 'pie',
+        data: {
+            labels: {{ metrics.by_status.keys()|list|tojson }},
+            datasets: [{
+                data: {{ metrics.by_status.values()|list|tojson }},
+                backgroundColor: ['#2563eb', '#0ea5e9', '#f59e0b', '#64748b', '#10b981', '#1e293b']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { position: 'right' }
+            }
+        }
+    });
+
+    const priorityCtx = document.getElementById('priorityChart').getContext('2d');
+    new Chart(priorityCtx, {
+        type: 'bar',
+        data: {
+            labels: {{ metrics.by_priority.keys()|list|tojson }},
+            datasets: [{
+                label: 'Tickets',
+                data: {{ metrics.by_priority.values()|list|tojson }},
+                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#dc2626']
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: { display: false }
+            }
+        }
+    });
+</script>
+{% endblock %}

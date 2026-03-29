@@ -1,0 +1,35 @@
+{% extends "portal/base.html" %}
+
+{% block title %}{{ article.title }} - {{ company_name }} Portal{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1 class="h4">{{ article.title }}</h1>
+</div>
+
+<div class="card mb-4">
+    <div class="card-body">
+        <div style="white-space: pre-wrap;">{{ article.content }}</div>
+    </div>
+    <div class="card-footer text-muted">
+        <small>
+            <span class="badge bg-secondary">{{ article.category }}</span>
+            <span class="mx-2">|</span>
+            <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
+        </small>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">
+        <h5 class="mb-0">Was this article helpful?</h5>
+    </div>
+    <div class="card-body">
+        <form method="POST" action="{{ url_for('knowledge.helpful', article_id=article.id) }}">
+            <button type="submit" class="btn btn-outline-success">
+                <i class="bi bi-hand-thumbs-up me-1"></i>Yes, it helped
+            </button>
+        </form>
+    </div>
+</div>
+{% endblock %}
