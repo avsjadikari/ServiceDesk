@@ -301,10 +301,33 @@ def db_init():
     if request.method == "POST":
         try:
             from sqlalchemy import text
+            import re
 
             db.session.commit()
-            db.session.execute(text("DROP SCHEMA public CASCADE"))
-            db.session.execute(text("CREATE SCHEMA public"))
+
+            # Get database URI to determine database type
+            db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
+
+            if "postgresql" in db_uri:
+                # PostgreSQL syntax
+                db.session.execute(text("DROP SCHEMA public CASCADE"))
+                db.session.execute(text("CREATE SCHEMA public"))
+            else:
+                # SQLite - delete all tables by dropping and recreating
+                # Get list of tables
+                result = db.session.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+                tables = [row[0] for row in result]
+
+                # Disable foreign keys temporarily
+                db.session.execute(text("PRAGMA foreign_keys = OFF"))
+
+                # Drop all tables
+                for table in tables:
+                    db.session.execute(text(f"DROP TABLE IF EXISTS {table}"))
+
+                # Re-enable foreign keys
+                db.session.execute(text("PRAGMA foreign_keys = ON"))
+
             db.session.commit()
 
             flash(
