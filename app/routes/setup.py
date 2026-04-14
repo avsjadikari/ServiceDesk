@@ -8,6 +8,7 @@ from flask import (
     session,
     send_file,
     jsonify,
+    current_app,
 )
 from flask_login import login_user, current_user
 from app import db
