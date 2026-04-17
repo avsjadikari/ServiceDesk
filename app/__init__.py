@@ -70,8 +70,9 @@ def create_app(config_name=None):
     login_manager.anonymous_user = AnonymousUser
 
     @app.context_processor
-    def inject_company_name():
+    def inject_globals():
         import os
+        from datetime import datetime, timezone
 
         company_name = "ServiceDesk"
         env_path = os.path.join(
@@ -84,7 +85,11 @@ def create_app(config_name=None):
                     if line.startswith("COMPANY_NAME="):
                         company_name = line.split("=", 1)[1].strip()
                         break
-        return dict(company_name=company_name)
+
+        return dict(
+            company_name=company_name,
+            now=datetime.utcnow,   # callable — templates use now() not now
+        )
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):
