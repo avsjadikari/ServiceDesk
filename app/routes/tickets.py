@@ -1,6 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
-from datetime import datetime
+from datetime import datetime, timezone
 from app import db
 from app.models import Ticket, Comment, User, Asset
 from app.forms import TicketForm, TicketFilterForm, CommentForm
@@ -179,13 +179,13 @@ def update_status(ticket_id):
         ticket.status = new_status
 
         if new_status == "in_progress" and not ticket.first_response_at:
-            ticket.first_response_at = datetime.utcnow()
+            ticket.first_response_at = datetime.now(timezone.utc)
 
         if new_status == "resolved":
-            ticket.resolved_at = datetime.utcnow()
+            ticket.resolved_at = datetime.now(timezone.utc)
 
         if new_status == "closed":
-            ticket.closed_at = datetime.utcnow()
+            ticket.closed_at = datetime.now(timezone.utc)
 
         db.session.commit()
 

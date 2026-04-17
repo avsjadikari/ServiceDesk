@@ -107,6 +107,22 @@ class ChangePasswordForm(FlaskForm):
     )
 
 
+class ProfileForm(FlaskForm):
+    """Form for users editing their own profile."""
+
+    full_name = StringField("Full Name", validators=[DataRequired(), Length(max=128)])
+    email = StringField("Email", validators=[DataRequired(), Email()])
+    department = StringField("Department", validators=[Optional(), Length(max=64)])
+    phone = StringField("Phone", validators=[Optional(), Length(max=20)])
+
+    def validate_email(self, email):
+        from flask_login import current_user
+
+        user = User.query.filter_by(email=email.data).first()
+        if user and user.id != current_user.id:
+            raise ValidationError("Email already in use by another account.")
+
+
 class UserEditForm(FlaskForm):
     username = StringField(
         "Username", validators=[DataRequired(), Length(min=3, max=64)]

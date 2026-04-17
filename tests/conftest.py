@@ -2,10 +2,11 @@ import os
 import sys
 import pytest
 
+# Set env vars BEFORE importing anything from the app
 os.environ["SECRET_KEY"] = os.environ.get(
     "SECRET_KEY", "test-secret-key-for-testing-123456789"
 )
-os.environ["FLASK_ENV"] = "testing"
+os.environ["FLASK_CONFIG"] = "testing"
 os.environ["DB_TYPE"] = "sqlite"
 
 sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
@@ -13,22 +14,18 @@ sys.path.insert(0, os.path.abspath(os.path.dirname(os.path.dirname(__file__))))
 
 @pytest.fixture(scope="session")
 def app():
-    from app import create_app, db
+    from app import create_app, db as _db
 
-    app = create_app("development")
-    app.config["TESTING"] = True
-    app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///:memory:"
-    app.config["WTF_CSRF_ENABLED"] = False
-    app.config["SERVER_NAME"] = "localhost"
+    _app = create_app("testing")
 
-    with app.app_context():
-        db.create_all()
+    with _app.app_context():
+        _db.create_all()
 
-    yield app
+    yield _app
 
-    with app.app_context():
-        db.session.remove()
-        db.drop_all()
+    with _app.app_context():
+        _db.session.remove()
+        _db.drop_all()
 
 
 @pytest.fixture(scope="function")
@@ -38,65 +35,74 @@ def client(app):
 
 @pytest.fixture(scope="function")
 def db(app):
-    from app import db as database
+    """Provide a clean DB session per test using savepoints / rollback."""
+    from app import db as _db
 
     with app.app_context():
-        database.session.rollback()
-        yield database
+        # Delete all rows before each test for isolation
+        for table in reversed(_db.metadata.sorted_tables):
+            _db.session.execute(table.delete())
+        _db.session.commit()
+        yield _db
+        _db.session.rollback()
 
 
 @pytest.fixture(scope="function")
 def admin_user(app, db):
     from app.models import User
 
-    user = User(
-        username="admin",
-        email="admin@test.com",
-        full_name="Admin User",
-        role="admin",
-        department="IT",
-        is_active=True,
-    )
-    user.set_password("Admin@123456")
-    db.session.add(user)
-    db.session.commit()
-    return user
+    with app.app_context():
+        user = User(
+            username="admin",
+            email="admin@test.com",
+            full_name="Admin User",
+            role="admin",
+            department="IT",
+            is_active=True,
+        )
+        user.set_password("Admin@123456")
+        db.session.add(user)
+        db.session.commit()
+        # Re-query to get a bound instance within this context
+        return db.session.get(User, user.id)
 
 
 @pytest.fixture(scope="function")
 def agent_user(app, db):
     from app.models import User
 
-    user = User(
-        username="agent",
-        email="agent@test.com",
-        full_name="Agent User",
-        role="agent",
-        department="Support",
-        is_active=True,
-    )
-    user.set_password("Agent@123456")
-    db.session.add(user)
-    db.session.commit()
-    return user
+    with app.app_context():
+        user = User(
+            username="agent",
+            email="agent@test.com",
+            full_name="Agent User",
+            role="agent",
+            department="Support",
+            is_active=True,
+        )
+        user.set_password("Agent@123456")
+        db.session.add(user)
+        db.session.commit()
+        return db.session.get(User, user.id)
 
 
 @pytest.fixture(scope="function")
 def regular_user(app, db):
     from app.models import User
 
-    user = User(
-        username="user",
-        email="user@test.com",
-        full_name="Regular User",
-        role="user",
-        department="Operations",
-        is_active=True,
-    )
-    user.set_password("User@123456")
-    db.session.add(user)
-    db.session.commit()
-    return user
+    with app.app_context():
+        user = User(
+            username="user",
+            email="user@test.com",
+            full_name="Regular User",
+            role="user",
+            department="Operations",
+            is_active=True,
+        )
+        user.set_password("User@123456")
+        db.session.add(user)
+        db.session.commit()
+        return db.session.get(User, user.id)
 
 
 @pytest.fixture(scope="function")

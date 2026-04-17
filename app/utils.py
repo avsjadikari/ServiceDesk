@@ -1,5 +1,5 @@
 import re
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from flask import current_app
 from app import db
 from app.models import Ticket, AuditLog, User
@@ -19,8 +19,8 @@ def calculate_sla_deadline(priority):
     sla_config = current_app.config.get("SLA_CONFIG", {})
     if priority in sla_config:
         hours = sla_config[priority]["resolution_hours"]
-        return datetime.utcnow() + timedelta(hours=hours)
-    return datetime.utcnow() + timedelta(hours=24)
+        return datetime.now(timezone.utc) + timedelta(hours=hours)
+    return datetime.now(timezone.utc) + timedelta(hours=24)
 
 
 def log_audit(

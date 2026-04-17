@@ -70,8 +70,10 @@ class TestTicketCreation:
 class TestTicketAccess:
     """Test ticket access control"""
 
-    def test_user_can_view_own_ticket(self, client, app, regular_user):
-        """Test user can view their own ticket"""
+    def test_user_can_view_own_ticket(self, client, app, db, regular_user, admin_user):
+        """Test user can view their own ticket.
+        admin_user fixture needed so check_setup doesn't redirect.
+        """
         with app.app_context():
             client.post("/login", data={"username": "user", "password": "User@123456"})
 
@@ -84,14 +86,15 @@ class TestTicketAccess:
                 priority="medium",
                 category="Hardware",
             )
-            app.db.session.add(ticket)
-            app.db.session.commit()
+            db.session.add(ticket)
+            db.session.commit()
 
-            response = client.get(f"/tickets/{ticket.id}")
+            response = client.get(f"/tickets/{ticket.id}", follow_redirects=True)
             assert response.status_code == 200
 
+
     def test_user_cannot_view_others_ticket(
-        self, client, app, regular_user, admin_user
+        self, client, app, db, regular_user, admin_user
     ):
         """Test user cannot view other users' tickets"""
         with app.app_context():
@@ -106,8 +109,8 @@ class TestTicketAccess:
                 priority="high",
                 category="Software",
             )
-            app.db.session.add(ticket)
-            app.db.session.commit()
+            db.session.add(ticket)
+            db.session.commit()
 
             response = client.get(f"/tickets/{ticket.id}")
             assert response.status_code == 403
@@ -116,7 +119,7 @@ class TestTicketAccess:
 class TestTicketStatus:
     """Test ticket status management"""
 
-    def test_update_ticket_status(self, client, app, admin_user):
+    def test_update_ticket_status(self, client, app, db, admin_user):
         """Test agent can update ticket status"""
         with app.app_context():
             client.post(
@@ -133,25 +136,26 @@ class TestTicketStatus:
                 priority="medium",
                 category="Hardware",
             )
-            app.db.session.add(ticket)
-            app.db.session.commit()
+            db.session.add(ticket)
+            db.session.commit()
+            ticket_id = ticket.id
 
             response = client.post(
-                f"/tickets/{ticket.id}/update-status",
+                f"/tickets/{ticket_id}/update-status",
                 data={"status": "in_progress"},
                 follow_redirects=True,
             )
 
             assert response.status_code == 200
 
-            ticket = Ticket.query.get(ticket.id)
-            assert ticket.status == "in_progress"
+            updated = db.session.get(Ticket, ticket_id)
+            assert updated.status == "in_progress"
 
 
 class TestTicketComments:
     """Test ticket commenting"""
 
-    def test_add_comment_to_ticket(self, client, app, admin_user):
+    def test_add_comment_to_ticket(self, client, app, db, admin_user):
         """Test adding comment to ticket"""
         with app.app_context():
             client.post(
@@ -167,8 +171,8 @@ class TestTicketComments:
                 priority="medium",
                 category="Hardware",
             )
-            app.db.session.add(ticket)
-            app.db.session.commit()
+            db.session.add(ticket)
+            db.session.commit()
 
             response = client.post(
                 f"/tickets/{ticket.id}/comment",
@@ -182,7 +186,7 @@ class TestTicketComments:
 class TestTicketAssignment:
     """Test ticket assignment"""
 
-    def test_assign_ticket_to_agent(self, client, app, admin_user, agent_user):
+    def test_assign_ticket_to_agent(self, client, app, db, admin_user, agent_user):
         """Test assigning ticket to agent"""
         with app.app_context():
             client.post(
@@ -198,17 +202,18 @@ class TestTicketAssignment:
                 priority="high",
                 category="Hardware",
             )
-            app.db.session.add(ticket)
-            app.db.session.commit()
+            db.session.add(ticket)
+            db.session.commit()
+            ticket_id = ticket.id
 
             response = client.post(
-                f"/tickets/{ticket.id}/assign",
+                f"/tickets/{ticket_id}/assign",
                 data={"assigned_to": str(agent_user.id)},
                 follow_redirects=True,
             )
 
             assert response.status_code == 200
 
-            ticket = Ticket.query.get(ticket.id)
-            assert ticket.assigned_to == agent_user.id
-            assert ticket.status == "assigned"
+            updated = db.session.get(Ticket, ticket_id)
+            assert updated.assigned_to == agent_user.id
+            assert updated.status == "assigned"

@@ -11,7 +11,7 @@ def get_database_uri():
     db_port = os.environ.get("DB_PORT", "5432")
     db_name = os.environ.get("DB_NAME", "servicedesk")
     db_user = os.environ.get("DB_USER", "servicedesk")
-    db_password = os.environ.get("DB_PASSWORD", "Zaq12wsX")
+    db_password = os.environ.get("DB_PASSWORD", "")
     db_ssl_mode = os.environ.get("DB_SSL_MODE", "prefer")
 
     if db_type == "postgresql":
@@ -92,8 +92,20 @@ class ProductionConfig(Config):
     DEBUG = False
 
 
+class TestingConfig(Config):
+    TESTING = True
+    DEBUG = True
+    SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+    WTF_CSRF_ENABLED = False
+    SERVER_NAME = "localhost"
+    RATELIMIT_ENABLED = False
+    # Use in-memory storage so tests don't need Redis
+    RATELIMIT_STORAGE_URI = "memory://"
+
+
 config = {
     "development": DevelopmentConfig,
     "production": ProductionConfig,
+    "testing": TestingConfig,
     "default": DevelopmentConfig,
 }

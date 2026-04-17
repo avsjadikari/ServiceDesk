@@ -18,6 +18,24 @@ limiter = Limiter(
 talisman = None
 
 
+class AnonymousUser:
+    """Anonymous user stub — inherits Flask-Login defaults and adds app-specific helpers."""
+
+    # Flask-Login checks is_authenticated as an attribute/property — provide it as False
+    is_authenticated = False
+    is_active = False
+    is_anonymous = True
+
+    def get_id(self):
+        return None
+
+    def is_agent(self):
+        return False
+
+    def is_admin(self):
+        return False
+
+
 def init_security(app):
     global talisman
 
@@ -49,6 +67,7 @@ def create_app(config_name=None):
 
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Please log in to access this page."
+    login_manager.anonymous_user = AnonymousUser
 
     @app.context_processor
     def inject_company_name():
@@ -106,7 +125,7 @@ def create_app(config_name=None):
     def check_setup():
         try:
             db.session.rollback()
-        except:
+        except Exception:
             pass
 
         if request.endpoint and request.endpoint not in [
@@ -114,6 +133,7 @@ def create_app(config_name=None):
             "setup.complete",
             "setup.create_tables",
             "static",
+            "health",
         ]:
             if not session.get("setup_complete"):
                 try:
@@ -124,12 +144,30 @@ def create_app(config_name=None):
                         logout_user()
                         session.clear()
                         return redirect(url_for("setup.wizard"))
-                except:
+                except Exception:
                     from flask_login import logout_user
 
                     logout_user()
                     session.clear()
                     return redirect(url_for("setup.wizard"))
+
+    @app.route("/health")
+    def health():
+        from flask import jsonify
+
+        try:
+            db.session.execute(db.text("SELECT 1"))
+            db_status = "ok"
+        except Exception:
+            db_status = "error"
+
+        return jsonify(
+            {
+                "status": "ok" if db_status == "ok" else "degraded",
+                "database": db_status,
+                "version": "1.0.0",
+            }
+        ), 200 if db_status == "ok" else 503
 
     return app
 

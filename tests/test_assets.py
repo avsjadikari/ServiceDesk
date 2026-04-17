@@ -5,12 +5,16 @@ from app.models import Asset, User
 class TestAssetManagement:
     """Test asset management functionality"""
 
-    def test_assets_index_page(self, client):
-        """Test assets index page loads"""
-        response = client.get("/assets")
-        assert response.status_code in [200, 302]
+    def test_assets_index_page(self, client, app, db, admin_user):
+        """Test assets index page loads (requires login)"""
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+            response = client.get("/assets")
+            assert response.status_code in [200, 302]
 
-    def test_create_asset_as_agent(self, client, app, admin_user):
+    def test_create_asset_as_agent(self, client, app, db, admin_user):
         """Test agent can create assets"""
         with app.app_context():
             client.post(
@@ -35,7 +39,7 @@ class TestAssetManagement:
             assert asset is not None
             assert asset.serial_number == "SN123456"
 
-    def test_view_asset(self, client, app, admin_user):
+    def test_view_asset(self, client, app, db, admin_user):
         """Test viewing asset details"""
         with app.app_context():
             client.post(
@@ -48,13 +52,13 @@ class TestAssetManagement:
                 serial_number="TEST001",
                 status="active",
             )
-            app.db.session.add(asset)
-            app.db.session.commit()
+            db.session.add(asset)
+            db.session.commit()
 
             response = client.get(f"/assets/{asset.id}")
             assert response.status_code == 200
 
-    def test_edit_asset(self, client, app, admin_user):
+    def test_edit_asset(self, client, app, db, admin_user):
         """Test editing an asset"""
         with app.app_context():
             client.post(
@@ -67,11 +71,12 @@ class TestAssetManagement:
                 serial_number="ORIG001",
                 status="active",
             )
-            app.db.session.add(asset)
-            app.db.session.commit()
+            db.session.add(asset)
+            db.session.commit()
+            asset_id = asset.id
 
             response = client.post(
-                f"/assets/{asset.id}/edit",
+                f"/assets/{asset_id}/edit",
                 data={
                     "name": "Updated Name",
                     "asset_type": "hardware",
@@ -88,11 +93,11 @@ class TestAssetManagement:
 
             assert response.status_code == 200
 
-            asset = Asset.query.get(asset.id)
-            assert asset.name == "Updated Name"
-            assert asset.status == "maintenance"
+            updated = db.session.get(Asset, asset_id)
+            assert updated.name == "Updated Name"
+            assert updated.status == "maintenance"
 
-    def test_assign_asset_to_user(self, client, app, admin_user, regular_user):
+    def test_assign_asset_to_user(self, client, app, db, admin_user, regular_user):
         """Test assigning asset to user"""
         with app.app_context():
             client.post(
@@ -105,11 +110,12 @@ class TestAssetManagement:
                 serial_number="ASSIGN001",
                 status="available",
             )
-            app.db.session.add(asset)
-            app.db.session.commit()
+            db.session.add(asset)
+            db.session.commit()
+            asset_id = asset.id
 
             response = client.post(
-                f"/assets/{asset.id}/edit",
+                f"/assets/{asset_id}/edit",
                 data={
                     "name": "Unassigned Laptop",
                     "asset_type": "hardware",
@@ -126,6 +132,6 @@ class TestAssetManagement:
 
             assert response.status_code == 200
 
-            asset = Asset.query.get(asset.id)
-            assert asset.assigned_to == regular_user.id
-            assert asset.status == "active"
+            updated = db.session.get(Asset, asset_id)
+            assert updated.assigned_to == regular_user.id
+            assert updated.status == "active"

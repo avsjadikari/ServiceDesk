@@ -1,9 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, session
 from flask_login import login_user, logout_user, login_required, current_user
+from urllib.parse import urlsplit
 from sqlalchemy import text
 from app import db, limiter
 from app.models import User
-from app.forms import LoginForm, RegistrationForm, UserEditForm, ChangePasswordForm
+from app.forms import LoginForm, RegistrationForm, UserEditForm, ChangePasswordForm, ProfileForm
 from app.utils import log_audit
 
 auth = Blueprint("auth", __name__)
@@ -41,6 +42,8 @@ def login():
 
 
 def complete_login(user, remember_me=False):
+    # Prevent session fixation: clear session before logging in
+    session.clear()
     login_user(user, remember=remember_me)
     log_audit(user.id, "login", "user", user.id)
 
@@ -49,6 +52,11 @@ def complete_login(user, remember_me=False):
         return redirect(url_for("auth.change_password"))
 
     next_page = request.args.get("next")
+    # Validate next URL — only allow relative paths (no external redirects)
+    if next_page:
+        parsed = urlsplit(next_page)
+        if parsed.netloc or parsed.scheme:
+            next_page = None
     if not next_page:
         if user.is_agent():
             next_page = url_for("main.dashboard")
@@ -184,16 +192,18 @@ def create_user():
 @auth.route("/profile", methods=["GET", "POST"])
 @login_required
 def profile():
-    if request.method == "POST":
-        current_user.full_name = request.form.get("full_name")
-        current_user.email = request.form.get("email")
-        current_user.department = request.form.get("department")
-        current_user.phone = request.form.get("phone")
+    form = ProfileForm(obj=current_user)
+    if form.validate_on_submit():
+        current_user.full_name = form.full_name.data
+        current_user.email = form.email.data
+        current_user.department = form.department.data
+        current_user.phone = form.phone.data
         db.session.commit()
+        log_audit(current_user.id, "profile_update", "user", current_user.id)
         flash("Profile updated successfully.", "success")
         return redirect(url_for("auth.profile"))
 
-    return render_template("auth/profile.html")
+    return render_template("auth/profile.html", form=form)
 
 
 @auth.route("/users")

@@ -5,12 +5,16 @@ from app.models import Article, User
 class TestKnowledgeBase:
     """Test knowledge base functionality"""
 
-    def test_kb_index_page_loads(self, client):
-        """Test KB index page loads"""
-        response = client.get("/knowledge")
-        assert response.status_code == 200
+    def test_kb_index_page_loads(self, client, app, db, admin_user):
+        """Test KB index page loads (requires login because anonymous user check)"""
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+            response = client.get("/knowledge")
+            assert response.status_code == 200
 
-    def test_create_article_as_agent(self, client, app, admin_user):
+    def test_create_article_as_agent(self, client, app, db, admin_user):
         """Test agent can create knowledge articles"""
         with app.app_context():
             client.post(
@@ -33,7 +37,7 @@ class TestKnowledgeBase:
             assert article is not None
             assert article.status == "published"
 
-    def test_view_article(self, client, app, admin_user):
+    def test_view_article(self, client, app, db, admin_user):
         """Test viewing an article"""
         with app.app_context():
             client.post(
@@ -47,13 +51,13 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             response = client.get(f"/knowledge/{article.id}")
             assert response.status_code == 200
 
-    def test_search_articles(self, client, app, admin_user):
+    def test_search_articles(self, client, app, db, admin_user):
         """Test searching articles"""
         with app.app_context():
             client.post(
@@ -67,13 +71,13 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             response = client.get("/knowledge?search=VPN")
             assert response.status_code == 200
 
-    def test_edit_article(self, client, app, admin_user):
+    def test_edit_article(self, client, app, db, admin_user):
         """Test editing an article"""
         with app.app_context():
             client.post(
@@ -87,11 +91,12 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
+            article_id = article.id
 
             response = client.post(
-                f"/knowledge/{article.id}/edit",
+                f"/knowledge/{article_id}/edit",
                 data={
                     "title": "Updated Title",
                     "content": "Updated content",
@@ -104,10 +109,10 @@ class TestKnowledgeBase:
 
             assert response.status_code == 200
 
-            article = Article.query.get(article.id)
-            assert article.title == "Updated Title"
+            updated = db.session.get(Article, article_id)
+            assert updated.title == "Updated Title"
 
-    def test_view_count_increments(self, client, app, admin_user):
+    def test_view_count_increments(self, client, app, db, admin_user):
         """Test view count increments on viewing"""
         with app.app_context():
             client.post(
@@ -122,10 +127,12 @@ class TestKnowledgeBase:
                 status="published",
                 view_count=0,
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
+            article_id = article.id
 
-            client.get(f"/knowledge/{article.id}")
+            client.get(f"/knowledge/{article_id}")
 
-            article = Article.query.get(article.id)
-            assert article.view_count == 1
+            db.session.expire_all()
+            updated = db.session.get(Article, article_id)
+            assert updated.view_count == 1

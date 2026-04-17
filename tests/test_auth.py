@@ -11,7 +11,7 @@ class TestAuthentication:
         assert response.status_code == 200
         assert b"Login" in response.data
 
-    def test_login_success(self, client, app, admin_user):
+    def test_login_success(self, client, app, db, admin_user):
         """Test successful login"""
         with app.app_context():
             response = client.post(
@@ -21,7 +21,7 @@ class TestAuthentication:
             )
             assert response.status_code == 200
 
-    def test_login_invalid_credentials(self, client, app, admin_user):
+    def test_login_invalid_credentials(self, client, app, db, admin_user):
         """Test login with invalid credentials"""
         with app.app_context():
             response = client.post(
@@ -29,7 +29,7 @@ class TestAuthentication:
             )
             assert b"Invalid username or password" in response.data
 
-    def test_logout(self, client, app, admin_user):
+    def test_logout(self, client, app, db, admin_user):
         """Test logout functionality"""
         with app.app_context():
             client.post(
@@ -43,7 +43,7 @@ class TestAuthentication:
         response = client.get("/register")
         assert response.status_code == 200
 
-    def test_registration_success(self, client, app):
+    def test_registration_success(self, client, app, db, admin_user):
         """Test successful user registration"""
         with app.app_context():
             response = client.post(
@@ -65,7 +65,7 @@ class TestAuthentication:
             assert user is not None
             assert user.email == "newuser@test.com"
 
-    def test_registration_duplicate_username(self, client, app, admin_user):
+    def test_registration_duplicate_username(self, client, app, db, admin_user):
         """Test registration with duplicate username"""
         with app.app_context():
             response = client.post(
@@ -89,7 +89,7 @@ class TestAuthentication:
 class TestPasswordStrength:
     """Test password strength validation"""
 
-    def test_weak_password_rejected(self, client, app):
+    def test_weak_password_rejected(self, client, app, db, admin_user):
         """Test that weak passwords are rejected"""
         with app.app_context():
             response = client.post(
@@ -104,7 +104,7 @@ class TestPasswordStrength:
             )
             assert response.status_code == 200
 
-    def test_password_without_uppercase_rejected(self, client, app):
+    def test_password_without_uppercase_rejected(self, client, app, db, admin_user):
         """Test password without uppercase is rejected"""
         with app.app_context():
             response = client.post(
@@ -123,7 +123,7 @@ class TestPasswordStrength:
 class TestAuthorization:
     """Test authorization and access control"""
 
-    def test_admin_can_access_users(self, client, app, admin_user):
+    def test_admin_can_access_users(self, client, app, db, admin_user):
         """Test admin can access user management"""
         with app.app_context():
             client.post(
@@ -132,16 +132,34 @@ class TestAuthorization:
             response = client.get("/users")
             assert response.status_code == 200
 
-    def test_regular_user_cannot_access_users(self, client, app, regular_user):
+    def test_regular_user_cannot_access_users(self, client, app, db, regular_user):
         """Test regular user cannot access user management"""
         with app.app_context():
             client.post("/login", data={"username": "user", "password": "User@123456"})
             response = client.get("/users")
             assert response.status_code == 302
 
-    def test_user_cannot_access_agent_dashboard(self, client, app, regular_user):
+    def test_user_cannot_access_agent_dashboard(self, client, app, db, regular_user):
         """Test regular user redirected from agent dashboard"""
         with app.app_context():
             client.post("/login", data={"username": "user", "password": "User@123456"})
             response = client.get("/dashboard", follow_redirects=True)
             assert response.status_code == 200
+
+
+class TestHealthEndpoint:
+    """Test health check endpoint"""
+
+    def test_health_endpoint_accessible(self, client):
+        """Test /health returns 200 without authentication"""
+        response = client.get("/health")
+        assert response.status_code == 200
+
+    def test_health_endpoint_returns_json(self, client):
+        """Test /health returns valid JSON with required fields"""
+        response = client.get("/health")
+        data = response.get_json()
+        assert data is not None
+        assert "status" in data
+        assert "database" in data
+        assert "version" in data

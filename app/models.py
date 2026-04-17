@@ -1,7 +1,12 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+
+
+def _now():
+    """Return current UTC time as a timezone-aware datetime."""
+    return datetime.now(timezone.utc)
 
 
 class User(UserMixin, db.Model):
@@ -19,7 +24,7 @@ class User(UserMixin, db.Model):
     must_change_password = db.Column(db.Boolean, default=False)
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_now)
 
     tickets_created = db.relationship(
         "Ticket", foreign_keys="Ticket.created_by", backref="creator", lazy="dynamic"
@@ -84,10 +89,8 @@ class Ticket(db.Model):
     resolved_at = db.Column(db.DateTime)
     closed_at = db.Column(db.DateTime)
 
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, default=_now, index=True)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     comments = db.relationship(
         "Comment", backref="ticket", lazy="dynamic", cascade="all, delete-orphan"
@@ -99,8 +102,13 @@ class Ticket(db.Model):
 
     @property
     def is_sla_breached(self):
-        if self.sla_deadline and datetime.utcnow() > self.sla_deadline:
-            if self.status not in ["resolved", "closed"]:
+        if self.sla_deadline:
+            now = _now()
+            # SQLite stores naive datetimes; compare correctly by stripping tz if needed
+            sla = self.sla_deadline
+            if sla.tzinfo is None:
+                now = now.replace(tzinfo=None)
+            if now > sla and self.status not in ["resolved", "closed"]:
                 return True
         return False
 
@@ -128,7 +136,7 @@ class Comment(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     content = db.Column(db.Text, nullable=False)
     is_internal = db.Column(db.Boolean, default=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_now)
 
     def __repr__(self):
         return f"<Comment {self.id} on Ticket {self.ticket_id}>"
@@ -147,10 +155,8 @@ class Article(db.Model):
     version = db.Column(db.Integer, default=1)
     view_count = db.Column(db.Integer, default=0)
     helpful_count = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     versions = db.relationship(
         "ArticleVersion",
@@ -170,7 +176,7 @@ class ArticleVersion(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
     version = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_now)
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
 
     def __repr__(self):
@@ -192,10 +198,8 @@ class Asset(db.Model):
     purchase_date = db.Column(db.Date)
     warranty_expiry = db.Column(db.Date)
     notes = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     tickets = db.relationship("Ticket", backref="asset", lazy="dynamic")
 
@@ -213,7 +217,7 @@ class Attachment(db.Model):
     file_size = db.Column(db.Integer)
     mime_type = db.Column(db.String(100))
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
+    created_at = db.Column(db.DateTime, default=_now)
 
     def __repr__(self):
         return f"<Attachment {self.filename}>"
@@ -230,7 +234,7 @@ class AuditLog(db.Model):
     ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"))
     details = db.Column(db.JSON)
     ip_address = db.Column(db.String(45))
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
+    created_at = db.Column(db.DateTime, default=_now, index=True)
 
     user = db.relationship("User", backref="audit_logs")
 
@@ -250,10 +254,8 @@ class AutomationRule(db.Model):
     action_config = db.Column(db.JSON)
     is_active = db.Column(db.Boolean, default=True)
     priority = db.Column(db.Integer, default=0)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    created_at = db.Column(db.DateTime, default=_now)
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     def __repr__(self):
         return f"<AutomationRule {self.name}>"
@@ -266,9 +268,7 @@ class Settings(db.Model):
     key = db.Column(db.String(100), unique=True, nullable=False, index=True)
     value = db.Column(db.Text)
     category = db.Column(db.String(50), default="general")
-    updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
-    )
+    updated_at = db.Column(db.DateTime, default=_now, onupdate=_now)
 
     def __repr__(self):
         return f"<Settings {self.key}>"
@@ -294,6 +294,6 @@ class Settings(db.Model):
             db.session.add(setting)
         try:
             db.session.commit()
-        except:
+        except Exception:
             db.session.rollback()
             raise
