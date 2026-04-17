@@ -11,9 +11,7 @@ portal = Blueprint("portal", __name__)
 @portal.route("/portal")
 @portal.route("/portal/home")
 def home():
-    if current_user.is_authenticated and current_user.is_agent():
-        return redirect(url_for("main.dashboard"))
-
+    # Agents can preview the portal (it opens in a new tab via target="_blank")
     recent_articles = (
         Article.query.filter_by(status="published")
         .order_by(Article.view_count.desc())
