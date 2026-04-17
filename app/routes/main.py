@@ -70,9 +70,3 @@ def my_tickets():
         )
 
     return render_template("main/my_tickets.html", tickets=tickets)
-
-
-@main.route("/settings")
-@login_required
-def settings():
-    return render_template("main/settings.html")

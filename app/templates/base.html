@@ -397,6 +397,7 @@
                     <ul class="dropdown-menu dropdown-menu-end">
                         <li><a class="dropdown-item" href="{{ url_for('auth.profile') }}">Profile</a></li>
                         {% if current_user.is_admin() %}
+                        <li><a class="dropdown-item" href="{{ url_for('settings.index') }}">System Settings</a></li>
                         <li><a class="dropdown-item" href="{{ url_for('auth.users') }}">Manage Users</a></li>
                         {% endif %}
                         <li><hr class="dropdown-divider"></li>

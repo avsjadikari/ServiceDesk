@@ -309,3 +309,45 @@ class AutomationRuleForm(FlaskForm):
         ],
     )
     is_active = BooleanField("Active")
+
+
+class SettingsForm(FlaskForm):
+    company_name = StringField(
+        "Company Name", validators=[DataRequired(), Length(max=100)]
+    )
+
+    db_type = SelectField(
+        "Database Type",
+        choices=[
+            ("sqlite", "SQLite (Development)"),
+            ("postgresql", "PostgreSQL (Production)"),
+        ],
+    )
+    db_host = StringField("Host", validators=[DataRequired(), Length(max=100)])
+    db_port = IntegerField("Port", validators=[DataRequired()])
+    db_name = StringField("Database Name", validators=[DataRequired(), Length(max=100)])
+    db_user = StringField("Database User", validators=[DataRequired(), Length(max=100)])
+    db_password = PasswordField("Database Password", validators=[Optional()])
+    db_ssl_mode = SelectField(
+        "SSL Mode",
+        choices=[
+            ("disable", "Disable"),
+            ("prefer", "Prefer"),
+            ("require", "Require"),
+            ("verify-full", "Verify Full"),
+        ],
+    )
+
+    mail_server = StringField(
+        "SMTP Server", validators=[DataRequired(), Length(max=100)]
+    )
+    mail_port = IntegerField("SMTP Port", validators=[DataRequired()])
+    mail_use_tls = BooleanField("Use TLS")
+    mail_use_ssl = BooleanField("Use SSL")
+    mail_username = StringField(
+        "SMTP Username", validators=[Optional(), Length(max=100)]
+    )
+    mail_password = PasswordField("SMTP Password", validators=[Optional()])
+    mail_default_sender = StringField(
+        "Default Sender Email", validators=[DataRequired(), Email(), Length(max=120)]
+    )

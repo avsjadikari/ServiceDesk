@@ -257,3 +257,43 @@ class AutomationRule(db.Model):
 
     def __repr__(self):
         return f"<AutomationRule {self.name}>"
+
+
+class Settings(db.Model):
+    __tablename__ = "settings"
+
+    id = db.Column(db.Integer, primary_key=True)
+    key = db.Column(db.String(100), unique=True, nullable=False, index=True)
+    value = db.Column(db.Text)
+    category = db.Column(db.String(50), default="general")
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+
+    def __repr__(self):
+        return f"<Settings {self.key}>"
+
+    @classmethod
+    def get(cls, key, default=None):
+        from app import db
+
+        setting = cls.query.filter_by(key=key).first()
+        if setting:
+            return setting.value
+        return default
+
+    @classmethod
+    def set(cls, key, value, category="general"):
+        from app import db
+
+        setting = cls.query.filter_by(key=key).first()
+        if setting:
+            setting.value = value
+        else:
+            setting = cls(key=key, value=value, category=category)
+            db.session.add(setting)
+        try:
+            db.session.commit()
+        except:
+            db.session.rollback()
+            raise

@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - {{ company_name }} ServiceDesk{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="page-header">
+        <h1><i class="bi bi-gear me-2"></i>System Settings</h1>
+    </div>
+
+    {% if db_changed %}
+    <div class="alert alert-warning">
+        <h4><i class="bi bi-exclamation-triangle me-2"></i>Database Configuration Changed</h4>
+        <p>You have changed the database configuration. You must log out and restart the application for changes to take effect.</p>
+        <form method="POST" action="{{ url_for('settings.save_db_change') }}">
+            <button type="submit" class="btn btn-primary">
+                <i class="bi bi-check-circle me-1"></i>Save & Logout
+            </button>
+            <a href="{{ url_for('settings.index') }}" class="btn btn-secondary">Cancel</a>
+        </form>
+    </div>
+    {% endif %}
+
+    <form method="POST">
+        {{ form.hidden_tag() }}
+        
+        <div class="row">
+            <!-- Company Settings -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-primary text-white">
+                        <h5 class="mb-0"><i class="bi bi-building me-2"></i>Company Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            {{ form.company_name.label(class="form-label") }}
+                            {{ form.company_name(class="form-control") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Database Settings -->
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header bg-info text-white">
+                        <h5 class="mb-0"><i class="bi bi-database me-2"></i>Database Settings</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            {{ form.db_type.label(class="form-label") }}
+                            {{ form.db_type(class="form-select") }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <div class="mb-3">
+                                    {{ form.db_host.label(class="form-label") }}
+                                    {{ form.db_host(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="col-md-4">
+                                <div class="mb-3">
+                                    {{ form.db_port.label(class="form-label") }}
+                                    {{ form.db_port(class="form-control", type="number") }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.db_name.label(class="form-label") }}
+                            {{ form.db_name(class="form-control") }}
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.db_user.label(class="form-label") }}
+                                    {{ form.db_user(class="form-control") }}
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    {{ form.db_password.label(class="form-label") }}
+                                    {{ form.db_password(class="form-control") }}
+                                    <small class="text-muted">Leave empty to keep current</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            {{ form.db_ssl_mode.label(class="form-label") }}
+                            {{ form.db_ssl_mode(class="form-select") }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Email Settings -->
+        <div class="card mb-4">
+            <div class="card-header bg-success text-white">
+                <h5 class="mb-0"><i class="bi bi-envelope me-2"></i>Email / SMTP Settings</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.mail_server.label(class="form-label") }}
+                            {{ form.mail_server(class="form-control") }}
+                        </div>
+                    </div>
+                    <div class="col-md-2">
+                        <div class="mb-3">
+                            {{ form.mail_port.label(class="form-label") }}
+                            {{ form.mail_port(class="form-control", type="number") }}
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="mb-3 mt-4">
+                            <div class="form-check">
+                                {{ form.mail_use_tls(class="form-check-input") }}
+                                {{ form.mail_use_tls.label(class="form-check-label") }}
+                            </div>
+                            <div class="form-check">
+                                {{ form.mail_use_ssl(class="form-check-input") }}
+                                {{ form.mail_use_ssl.label(class="form-check-label") }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.mail_username.label(class="form-label") }}
+                            {{ form.mail_username(class="form-control") }}
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            {{ form.mail_password.label(class="form-label") }}
+                            {{ form.mail_password(class="form-control") }}
+                            <small class="text-muted">Leave empty to keep current</small>
+                        </div>
+                    </div>
+                </div>
+                <div class="mb-3">
+                    {{ form.mail_default_sender.label(class="form-label") }}
+                    {{ form.mail_default_sender(class="form-control") }}
+                </div>
+            </div>
+        </div>
+
+        <div class="mb-4">
+            <button type="submit" class="btn btn-primary btn-lg">
+                <i class="bi bi-save me-2"></i>Save Settings
+            </button>
+            <a href="{{ url_for('main.dashboard') }}" class="btn btn-secondary btn-lg">Cancel</a>
+        </div>
+    </form>
+</div>
+{% endblock %}

@@ -10,6 +10,7 @@ logger = logging.getLogger(__name__)
 
 def init_mail(app):
     mail.init_app(app)
+    logger.info(f"Flask-Mail initialized with server: {app.config.get('MAIL_SERVER')}")
 
 
 def send_email(to, subject, body, html=None, template=None):

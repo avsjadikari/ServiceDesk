@@ -12,9 +12,13 @@ def get_database_uri():
     db_name = os.environ.get("DB_NAME", "servicedesk")
     db_user = os.environ.get("DB_USER", "servicedesk")
     db_password = os.environ.get("DB_PASSWORD", "Zaq12wsX")
+    db_ssl_mode = os.environ.get("DB_SSL_MODE", "prefer")
 
     if db_type == "postgresql":
-        return f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        uri = f"postgresql://{db_user}:{db_password}@{db_host}:{db_port}/{db_name}"
+        if db_ssl_mode != "disable":
+            uri += f"?sslmode={db_ssl_mode}"
+        return uri
     else:
         return "sqlite:///servicedesk.db"
 
@@ -29,11 +33,19 @@ class Config:
     SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
-    MAIL_SERVER = os.environ.get("MAIL_SERVER") or "smtp.gmail.com"
+    MAIL_SERVER = os.environ.get("MAIL_SERVER", "smtp.gmail.com")
     MAIL_PORT = int(os.environ.get("MAIL_PORT") or 587)
     MAIL_USE_TLS = os.environ.get("MAIL_USE_TLS", "true").lower() in ["true", "on", "1"]
+    MAIL_USE_SSL = os.environ.get("MAIL_USE_SSL", "false").lower() in [
+        "true",
+        "on",
+        "1",
+    ]
     MAIL_USERNAME = os.environ.get("MAIL_USERNAME")
     MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD")
+    MAIL_DEFAULT_SENDER = os.environ.get(
+        "MAIL_DEFAULT_SENDER", "noreply@servicedesk.local"
+    )
 
     PERMANENT_SESSION_LIFETIME = timedelta(hours=24)
 

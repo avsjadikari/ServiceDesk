@@ -5,7 +5,9 @@ from flask_login import LoginManager
 from flask_wtf import CSRFProtect
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from flask_talisman import Talisman
 from config import config
+from app.email_utils import init_mail
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -13,6 +15,22 @@ csrf = CSRFProtect()
 limiter = Limiter(
     key_func=get_remote_address, default_limits=["200 per day", "50 per hour"]
 )
+talisman = None
+
+
+def init_security(app):
+    global talisman
+
+    if not app.config.get("DEBUG", False):
+        talisman = Talisman(
+            app,
+            content_security_policy=None,
+            force_https_permanent=True,
+            strict_transport_security="max-age=31536000; includeSubDomains",
+            x_content_type_options="nosniff",
+            x_frame_options="DENY",
+            referrer_policy="strict-origin-when-cross-origin",
+        )
 
 
 def create_app(config_name=None):
@@ -27,12 +45,27 @@ def create_app(config_name=None):
     csrf.init_app(app)
     limiter.init_app(app)
 
+    init_security(app)
+
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Please log in to access this page."
 
     @app.context_processor
     def inject_company_name():
-        return dict(company_name=app.config.get("COMPANY_NAME", "ServiceDesk"))
+        import os
+
+        company_name = "ServiceDesk"
+        env_path = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), ".env"
+        )
+        if os.path.exists(env_path):
+            with open(env_path, "r") as f:
+                for line in f:
+                    line = line.strip()
+                    if line.startswith("COMPANY_NAME="):
+                        company_name = line.split("=", 1)[1].strip()
+                        break
+        return dict(company_name=company_name)
 
     @app.teardown_appcontext
     def shutdown_session(exception=None):
@@ -56,6 +89,7 @@ def create_app(config_name=None):
     from app.routes.analytics import analytics as analytics_bp
     from app.routes.portal import portal as portal_bp
     from app.routes.api import api as api_bp
+    from app.routes.settings import settings_bp
 
     app.register_blueprint(setup_bp)
     app.register_blueprint(auth_bp)
@@ -66,6 +100,7 @@ def create_app(config_name=None):
     app.register_blueprint(analytics_bp)
     app.register_blueprint(portal_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
+    app.register_blueprint(settings_bp)
 
     @app.before_request
     def check_setup():
@@ -77,6 +112,7 @@ def create_app(config_name=None):
         if request.endpoint and request.endpoint not in [
             "setup.wizard",
             "setup.complete",
+            "setup.create_tables",
             "static",
         ]:
             if not session.get("setup_complete"):

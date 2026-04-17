@@ -9,7 +9,7 @@ from flask import (
     send_file,
     jsonify,
 )
-from flask_login import login_user, current_user
+from flask_login import login_user, current_user, login_required
 from app import db
 from app.models import User, Article
 from app.forms import SetupForm
@@ -290,6 +290,26 @@ Contact IT support if you cannot access your assigned drives.""",
 def complete():
     session["setup_complete"] = True
     return redirect(url_for("main.index"))
+
+
+@setup.route("/admin/db/create-tables")
+def create_tables():
+    try:
+        from app import db as app_db
+
+        with app_db.app_context():
+            app_db.create_all()
+        flash("Database tables created successfully!", "success")
+    except Exception as e:
+        try:
+            app_db.session.rollback()
+        except:
+            pass
+        flash(f"Error creating tables: {str(e)}", "danger")
+
+    from flask import url_for, redirect
+
+    return redirect(url_for("settings.index"))
 
 
 @setup.route("/admin/db/init", methods=["GET", "POST"])
