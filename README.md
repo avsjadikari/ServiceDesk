@@ -1,380 +1,237 @@
 # ServiceDesk Application
 
-Enterprise IT Service Management (ITSM) system built with Python Flask.
+Enterprise IT Service Management system built with Python Flask.
 
 ## Features
 
-- **Ticket Management**: Create, assign, track, and resolve support tickets with full SLA management
-- **Knowledge Base**: Self-service articles with full-text search and versioning
-- **Asset Management**: Track IT assets (hardware/software/network) and link to tickets
-- **Automation**: Auto-assignment, SLA management, workflow rules engine
-- **Analytics**: Dashboard with metrics, charts, and SLA compliance reporting
-- **Self-Service Portal**: Customer-facing ticket submission and real-time tracking
-- **Multi-Theme Support**: Blue, green, purple, red, light, and dark themes
-- **Two-Factor Authentication (2FA)**: TOTP-based 2FA via authenticator apps (Google Authenticator, Authy)
-- **Rate Limiting**: Brute-force protection (5 login attempts/min, 200 req/day)
-- **Email Notifications**: Ticket creation, assignment, status changes, and security events
-- **Audit Logging**: Comprehensive per-action audit trail stored in database
-- **Health Monitoring**: `/health` endpoint for load balancer and uptime checks
-- **CSRF Protection**: All forms protected with Flask-WTF CSRF tokens
-- **Security Headers**: TLS enforcement, HSTS, X-Frame-Options, referrer policy (production)
-- **Session Fixation Protection**: Session is regenerated on login
+- **Ticket Management** – Create, assign, track, and resolve support tickets
+- **Knowledge Base** – Self‑service articles with full‑text search
+- **Asset Management** – Track IT assets and link them to tickets
+- **Automation** – Auto‑assignment, SLA management, workflow rules
+- **Analytics** – Dashboard with metrics, charts, and SLA compliance
+- **Self‑Service Portal** – Customer‑facing ticket submission and tracking
+- **Multi‑theme Support** – Blue, green, purple, red, light, and dark themes
+- **Two‑Factor Authentication (2FA)** – TOTP‑based 2FA using authenticator apps
+- **Rate Limiting** – Protection against brute‑force attacks
+- **Email Notifications** – Automatic notifications for ticket events
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Backend** | Python 3.10+, Flask 3.x |
-| **Database** | SQLite (dev), PostgreSQL 14+ (prod) |
-| **ORM** | SQLAlchemy 2.x |
-| **Authentication** | Flask-Login |
-| **Frontend** | Bootstrap 5, Chart.js |
-| **Forms & Validation** | Flask-WTF, WTForms |
-| **Security** | Flask-Talisman, Flask-Limiter, PyOTP |
-| **Email** | Flask-Mail |
-| **Production Server** | Gunicorn |
+- **Backend** – Python 3.10+, Flask 3.x
+- **Database** – SQLite (development), PostgreSQL (production) via SQLAlchemy
+- **Authentication** – Flask‑Login with role‑based access control
+- **Frontend** – Bootstrap 5, Chart.js
+- **Forms** – Flask‑WTF
+- **Security** – Flask‑Limiter, PyOTP (2FA), Flask‑Mail
 
 ## Prerequisites
 
-- **Python** 3.10 or higher
-- **pip** 22+
-- **PostgreSQL** 14+ (for production deployments)
-- An SMTP server (optional — for email notifications)
+- Python 3.10 or higher
+- PostgreSQL (for production use)
+- `pip` (Python package installer)
 
----
-
-## Installation
+## Installation & Setup
 
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone <repository‑url>
 cd ServiceDesk
 ```
 
 ### 2. Create a Virtual Environment
 
 ```bash
-# Linux / macOS
 python -m venv venv
-source venv/bin/activate
-
-# Windows (PowerShell)
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+source venv/bin/activate   # Linux/macOS
+# or
+venv\Scripts\activate      # Windows
 ```
 
-### 3. Install Dependencies
+### 3. Install Python Dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Configure Environment Variables
+### 4. Create an Environment File
 
-Copy the example env file and edit it:
+The project uses a `.env` file for configuration. A starter template (`.env.example`) is **not** shipped – you must create it manually. Below is a minimal example; copy it to `.env` and edit the values:
 
-```bash
-cp .env.example .env
-```
-
-**Required variables:**
-
-```env
-# Generate with: python -c "import secrets; print(secrets.token_hex(64))"
-SECRET_KEY=your-64-char-hex-secret-key
-
-COMPANY_NAME=YourCompany
-FLASK_CONFIG=development
-```
-
-**Database (SQLite for dev, PostgreSQL for prod):**
-
-```env
-# SQLite (default — no extra config needed)
-DB_TYPE=sqlite
-
-# PostgreSQL
-DB_TYPE=postgresql
+```dotenv
+# Database configuration – choose sqlite for development or postgresql for production
+DB_TYPE=sqlite               # or postgresql
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=servicedesk
-DB_USER=servicedesk_user
-DB_PASSWORD=strong-password-here
-DB_SSL_MODE=require          # require in production, prefer in dev
+DB_USER=servicedesk
+DB_PASSWORD=your‑db‑password
+
+# Secret key – generate a strong random 64‑byte hex string
+# python -c "import secrets; print(secrets.token_hex(64))"
+SECRET_KEY=replace‑with‑generated‑hex
+
+# Company name shown in the UI
+COMPANY_NAME=YourCompany
+
+# Flask environment (development or production)
+FLASK_ENV=development
+FLASK_DEBUG=true
 ```
 
-**Email / SMTP (optional):**
+**Important:** `SECRET_KEY` must be set before the app starts; otherwise the application will raise an exception on startup.
 
-```env
-MAIL_SERVER=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USE_TLS=true
-MAIL_USERNAME=your-email@gmail.com
-MAIL_PASSWORD=your-app-password   # Gmail App Password (not account password)
-MAIL_DEFAULT_SENDER=noreply@yourcompany.com
-```
+### 5. Initialise the Database
 
-### 5. Initialize the Database
+The repository provides a helper that creates all tables and seeds default users/articles. Run it **once** after the first install:
 
 ```bash
-python -c "from app import create_app, db; app = create_app(); app.app_context().push(); db.create_all()"
+python -c "from app import init_database; init_database()"
 ```
 
-### 6. Run the Application
+If you prefer the UI wizard, simply start the server (step 6) – the first request will redirect to `/setup` where you can configure the database and admin account.
 
-**Development:**
+### 6. Run the Development Server
 
 ```bash
 python run.py
 ```
 
-**Production (Gunicorn):**
+Open a browser at **http://localhost:5000**.
+
+### 7. First‑Time Setup Wizard (optional)
+
+If the database is empty, the application automatically redirects to the **Setup Wizard** (`/setup`). The wizard will:
+
+1. Ask for the company name
+2. Let you choose the database backend and connection details
+3. Create an initial **admin** account (default password `Admin@123456` – **must be changed on first login**)
+4. Create default **agent** (`Agent@123456`) and **user** (`User@123456`) accounts (also forced password change)
+5. Seed three sample knowledge‑base articles
+
+> **Security note:** The wizard stores the provided credentials as plaintext passwords in the code (`generate_password_hash` is used, but the passwords themselves are hard‑coded). Change these passwords immediately after the first login.
+
+## Default Users (after first‑time setup)
+
+| Username | Password | Role |
+|----------|----------|------|
+| admin    | Admin@123456 | Admin |
+| agent    | Agent@123456 | Agent |
+| user     | User@123456  | User |
+
+All three users are flagged with `must_change_password=True` and will be redirected to the *Change Password* page on first login.
+
+## Password Policy
+
+- Minimum **8** characters (recommended **12+** for production)
+- At least **1** uppercase letter
+- At least **1** lowercase letter
+- At least **1** digit
+- At least **1** special character (`@$!%*?&`)
+
+The registration and change‑password forms enforce this policy via WTForms validators.
+
+## Running the Test Suite
 
 ```bash
-gunicorn -w 4 -b 0.0.0.0:8000 "app:create_app('production')"
-```
+# Install test dependencies (already in requirements.txt)
+pip install pytest pytest-cov pytest-flask
 
-Open your browser to `http://localhost:5000` (dev) or `http://your-server:8000` (prod).
-
----
-
-## First-Time Setup Wizard
-
-1. Navigate to `http://localhost:5000/setup`
-2. Enter your **Company Name**
-3. Configure **Database** settings
-4. Create the **Admin Account**
-5. Complete setup — you will be redirected to the login page
-
----
-
-## Default Users
-
-After setup completes, three demo users are created. **Passwords must be changed on first login.**
-
-| Username | Default Password | Role | Access |
-|----------|-----------------|------|--------|
-| `admin` | `Admin@123456` | Admin | Full access + user management |
-| `agent` | `Agent@123456` | Agent | Ticket management, knowledge base, assets |
-| `user` | `User@123456` | User | Self-service portal only |
-
-> ⚠️ **Change these passwords immediately** in production.
-
----
-
-## Password Requirements
-
-All passwords must satisfy:
-
-- Minimum **8 characters**
-- At least **1 uppercase** letter (A–Z)
-- At least **1 lowercase** letter (a–z)
-- At least **1 number** (0–9)
-- At least **1 special character** (`@$!%*?&`)
-
----
-
-## Running Tests
-
-```bash
-# Run all tests
+# Execute all tests
 pytest
 
-# Run with verbose output
-pytest -v
-
-# Run with coverage report
+# Generate an HTML coverage report
 pytest --cov=app --cov-report=html
-
-# View HTML coverage report
-# Open htmlcov/index.html in your browser
 ```
 
-### Test Configuration
-
-Tests use an **in-memory SQLite database** and have CSRF disabled automatically via the `testing` config. No `.env` changes are required to run tests — the `conftest.py` sets all required environment variables.
-
-```bash
-# Run a specific test module
-pytest tests/test_auth.py -v
-
-# Run a specific test class
-pytest tests/test_tickets.py::TestTicketCreation -v
-```
-
----
+Coverage reports are written to `htmlcov/`.
 
 ## Project Structure
 
 ```
 ServiceDesk/
-├── app/
-│   ├── __init__.py          # Application factory, AnonymousUser, health endpoint
-│   ├── models.py            # SQLAlchemy database models
-│   ├── forms.py             # WTForms form classes (with validation)
-│   ├── utils.py             # Utility functions (SLA, ticket numbers, audit)
-│   ├── email_utils.py       # Email notification functions
-│   ├── backup.py            # Database backup/restore utilities
-│   └── routes/
-│       ├── auth.py          # Login, logout, registration, 2FA, profile
-│       ├── main.py          # Agent dashboard
-│       ├── tickets.py       # Ticket CRUD and workflow
-│       ├── knowledge.py     # Knowledge base articles
-│       ├── assets.py        # IT asset management
-│       ├── analytics.py     # Reporting and metrics
-│       ├── portal.py        # Self-service portal (end-users)
-│       ├── api.py           # REST API endpoints
-│       ├── settings.py      # Admin settings panel
-│       └── setup.py         # First-time setup wizard
-├── tests/
-│   ├── conftest.py          # Pytest fixtures and test app configuration
-│   ├── test_auth.py         # Authentication and authorization tests
-│   ├── test_tickets.py      # Ticket management tests
-│   ├── test_knowledge.py    # Knowledge base tests
-│   └── test_assets.py       # Asset management tests
-├── config.py                # DevelopmentConfig, ProductionConfig, TestingConfig
-├── run.py                   # Application entry point
+├── app/                     # Flask application package
+│   ├── __init__.py          # App factory, DB init, blueprint registration
+│   ├── models.py            # SQLAlchemy models (User, Ticket, Article, …)
+│   ├── forms.py            # WTForms definitions
+│   ├── utils.py            # Helper functions (ticket numbers, SLA, automation)
+│   ├── routes/             # Blueprint modules (auth, tickets, knowledge, …)
+│   │   ├── auth.py
+│   │   ├── tickets.py
+│   │   ├── knowledge.py
+│   │   ├── assets.py
+│   │   ├── analytics.py
+│   │   ├── portal.py
+│   │   ├── api.py
+│   │   └── setup.py
+│   └── templates/          # Jinja2 UI templates (grouped by feature)
+├── tests/                  # Pytest suite
+├── config.py                # Configuration classes (development / production)
+├── run.py                   # Entry point (`python run.py`)
 ├── requirements.txt         # Python dependencies
-├── .env                     # Environment variables (do NOT commit)
-├── .env.example             # Example env file (safe to commit)
-├── .gitignore               # Git ignore rules
-├── SECURITY.md              # Security policy and assessment
-└── SPEC.md                  # Application specification
+├── SECURITY.md              # Security review & hardening checklist
+└── SPEC.md                  # Full functional specification
 ```
 
----
+## Security & Hardening (see `SECURITY.md` for full details)
 
-## API Endpoints
+- **CSRF protection** – Flask‑WTF adds tokens to every form.
+- **Password hashing** – Werkzeug's `generate_password_hash` (PBKDF2‑SHA256).
+- **Audit logging** – All user actions are stored in the `audit_logs` table.
+- **Rate limiting** – Global limits (`200 per day, 50 per hour`) plus per‑endpoint limits (e.g., login limited to 5 req/min).
+- **Two‑factor authentication** – TOTP support via PyOTP.
+- **Session security** – Flask‑Login with server‑side session handling.
 
-All API endpoints are prefixed with `/api`.
+**Production hardening checklist** (summarised):
 
-### Authentication
+1. Generate a strong, unique `SECRET_KEY`.
+2. Switch `FLASK_ENV` to `production` and set `FLASK_DEBUG=false`.
+3. Serve the app behind a reverse proxy (NGINX/Traefik) with **HTTPS** termination.
+4. Add security headers (CSP, HSTS, X‑Frame‑Options) – e.g., using `flask‑talisman`.
+5. Enable account lockout after repeated failed logins (custom middleware or extend the limiter).
+6. Configure a real email backend for notifications.
+7. Set up log aggregation and a database backup strategy.
+8. Consider LDAP/AD integration or SSO for enterprise authentication.
+9. Remove the hard‑coded default passwords from the setup wizard or force password change before the wizard completes.
 
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/api/users` | Agent | List all users |
+## Missing / Incomplete Scripts & Code Issues
 
-### Tickets
+| File / Feature | Issue | Suggested Fix |
+|---------------|-------|--------------|
+| `app/routes/setup.py` | Uses `generate_password_hash` incorrectly (assigns to `password_hash` directly) and hard‑codes default passwords (`admin123`, `agent123`, `user123`). | Use the `User.set_password()` method and generate random passwords, then force a password reset via email or UI. |
+| `.env.example` | Not shipped; users must create `.env` manually. | Add a minimal `.env.example` to the repo (see the example above). |
+| Database migrations | No migration tool (e.g., Flask‑Migrate) included. | Add Flask‑Migrate to manage schema changes in production. |
+| `SECURITY.md` notes hard‑coded `SECRET_KEY` in `config.py` – the code raises an error if `SECRET_KEY` is missing, but the repository does not provide a way to generate one automatically. | Provide a CLI helper (`hermes config set SECRET_KEY <value>`) or documentation on generating the key. |
+| Rate limiting on many routes | Only the login route is explicitly limited; other potentially sensitive endpoints (password reset, 2FA, API) lack limits. | Add `@limiter.limit` decorators to those routes. |
+| Missing input sanitisation for rendered user content | Templates directly output user‑provided text (e.g., ticket descriptions). | Implement a sanitisation helper (e.g., `bleach`) in `utils.py` and use it before storing/displaying markdown. |
+| No CSRF token on API endpoints | The REST API (`/api/*`) does not enforce CSRF protection. | Either disable CSRF for API (with proper token auth) or switch to token‑based authentication (JWT). |
+| No automated test for the setup wizard | The test suite covers auth, tickets, assets, knowledge but not the first‑time setup flow. | Add a `tests/test_setup.py` that verifies the wizard creates the admin user and writes `.env`. |
+| Hard‑coded password reset token length/pattern | In `email_utils.send_password_reset` the token is generated elsewhere (not shown). Ensure token length meets security policy. |
 
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/api/tickets` | Agent | List all tickets |
-| `POST` | `/api/tickets` | User | Create ticket |
-| `GET`  | `/api/tickets/<id>` | User (own) / Agent (all) | Get ticket |
-| `PUT`  | `/api/tickets/<id>` | Agent | Update ticket |
-| `DELETE` | `/api/tickets/<id>` | Agent | Delete ticket |
+Addressing the items above will improve reliability, security, and developer experience.
 
-### Knowledge Base
+## Recommendations & Next Steps
 
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/api/articles` | None | List published articles |
-| `GET`  | `/api/articles/<id>` | None | Get article |
-| `GET`  | `/api/articles?search=<q>` | None | Search articles |
+1. **Add `.env.example`** – commit the example file so new developers have a clear starting point.
+2. **Refactor the setup wizard** to:
+   - Generate random passwords (or ask the installer to provide them).
+   - Use `User.set_password()` instead of directly assigning `password_hash`.
+   - Ensure `must_change_password` is set so admins must change their passwords immediately.
+3. **Integrate Flask‑Migrate** for schema versioning.
+4. **Hardening** – add Flask‑Talisman, enable HSTS, CSP, and secure cookie flags.
+5. **Rate‑limit** all authentication‑related endpoints (login, 2FA, password reset, API token endpoints).
+6. **Sanitise** any user‑generated markdown before rendering (use `bleach` or a safe markdown renderer).
+7. **Extend tests** to cover the setup wizard and any newly added security measures.
+8. **Documentation** – update the README (this file) and `SECURITY.md` with the above changes.
 
-### Assets
+## Contributing
 
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/api/assets` | Agent | List all assets |
-| `GET`  | `/api/assets/<id>` | User (own) / Agent (all) | Get asset |
-
-### Analytics
-
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/api/analytics/dashboard` | Agent | Dashboard metrics + SLA |
-
-### Health
-
-| Method | Endpoint | Auth Required | Description |
-|--------|----------|--------------|-------------|
-| `GET`  | `/health` | None | Application health check |
-
----
-
-## Enterprise Features
-
-### Implemented ✅
-
-| Feature | Details |
-|---------|---------|
-| Role-Based Access Control | Admin / Agent / User with granular permissions |
-| SLA Management | Configurable response + resolution times per priority |
-| Audit Logging | All user actions logged with IP address to database |
-| Two-Factor Authentication | TOTP via Google Authenticator / Authy |
-| Session Fixation Protection | Session regenerated on every login |
-| Open Redirect Protection | `next` URL validated as relative path only |
-| Password Strength Enforcement | Regex-validated complexity requirements |
-| Rate Limiting | Per-endpoint and global limits via Flask-Limiter |
-| CSRF Protection | Flask-WTF tokens on all state-changing forms |
-| Security Headers | HSTS, X-Frame-Options, referrer policy (production) |
-| Profile Form Validation | WTForms validates all profile update inputs |
-| Health Endpoint | `/health` returns DB status + version (no auth) |
-| Multi-Theme Support | 6 themes; stored per user preference |
-| Database Backup | CLI backup/restore utility |
-| Email Notifications | Ticket events, 2FA events, security alerts |
-
-### Recommended for Production 🔧
-
-| Priority | Feature | Notes |
-|----------|---------|-------|
-| **HIGH** | LDAP/Active Directory Integration | Sync users from corporate directory |
-| **HIGH** | Account Lockout | Lock account after N failed login attempts |
-| **HIGH** | Password Reset Flow | Email-based self-service password reset |
-| **HIGH** | API Key Authentication | Machine-to-machine API access without session |
-| **MEDIUM** | SSO / SAML 2.0 | Single sign-on (Okta, Azure AD, etc.) |
-| **MEDIUM** | Slack/Teams Webhooks | Real-time channel notifications |
-| **MEDIUM** | OpenAPI / Swagger Docs | Auto-generated API documentation |
-| **MEDIUM** | S3 / Cloud File Storage | Attachment storage outside local disk |
-| **MEDIUM** | Prometheus Metrics | Export metrics for Grafana dashboards |
-| **LOW** | Elasticsearch Integration | Full-text search at scale |
-| **LOW** | GDPR Data Export | Right-to-access and right-to-deletion |
-
----
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for the full security assessment and production checklist.
-
----
-
-## Troubleshooting
-
-### `SECRET_KEY environment variable is required`
-
-Ensure `.env` is properly configured with a `SECRET_KEY` value:
-
-```bash
-python -c "import secrets; print(secrets.token_hex(64))"
-```
-
-Copy the output into your `.env` file.
-
-### Database Connection Issues (PostgreSQL)
-
-1. Verify PostgreSQL is running: `pg_isready`
-2. Create the database: `createdb servicedesk`
-3. Verify credentials in `.env`
-4. Check `DB_SSL_MODE` — use `prefer` for local dev, `require` for production
-
-### Import / Dependency Errors
-
-```bash
-pip install -r requirements.txt
-```
-
-### Rate Limit Warnings in Tests
-
-The `TestingConfig` automatically sets `RATELIMIT_ENABLED = False`. These warnings only appear in development mode.
-
-### `can't compare offset-naive and offset-aware datetimes`
-
-This is resolved — the `is_sla_breached` property now correctly handles both SQLite (naive) and PostgreSQL (aware) datetime storage.
-
----
+1. Fork the repository
+2. Create a feature branch (`git checkout -b my‑feature`)
+3. Write tests for your changes (`tests/`)
+4. Ensure the entire test suite passes (`pytest`)
+5. Submit a Pull Request with a concise description and reference any open issue.
 
 ## License
 
-MIT License
+MIT License – see the `LICENSE` file.
