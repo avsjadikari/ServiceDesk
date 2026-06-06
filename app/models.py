@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_login import UserMixin
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
@@ -19,6 +19,9 @@ class User(UserMixin, db.Model):
     must_change_password = db.Column(db.Boolean, default=False)
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32))
+    failed_login_count = db.Column(db.Integer, default=0, nullable=False)
+    locked_until = db.Column(db.DateTime, nullable=True)
+    last_password_reset_at = db.Column(db.DateTime, nullable=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     tickets_created = db.relationship(
@@ -42,6 +45,41 @@ class User(UserMixin, db.Model):
 
     def is_agent(self):
         return self.role in ["admin", "agent"]
+
+    def is_locked(self):
+        if self.locked_until and self.locked_until > datetime.utcnow():
+            return True
+        return False
+
+    def record_failed_login(self, max_attempts=5, lockout_minutes=15):
+        self.failed_login_count = (self.failed_login_count or 0) + 1
+        if self.failed_login_count >= max_attempts:
+            self.locked_until = datetime.utcnow() + timedelta(minutes=lockout_minutes)
+            return True
+        return False
+
+    def reset_failed_logins(self):
+        self.failed_login_count = 0
+        self.locked_until = None
+
+    def lock(self, minutes=15):
+        """Manually lock the account. Used by admins to block a user."""
+        self.locked_until = datetime.utcnow() + timedelta(minutes=minutes)
+        return self.locked_until
+
+    def unlock(self):
+        """Manually unlock the account. Clears any active lockout."""
+        self.locked_until = None
+        self.failed_login_count = 0
+
+    @property
+    def account_status(self):
+        """Return one of: 'disabled', 'locked', 'active'."""
+        if not self.is_active:
+            return "disabled"
+        if self.is_locked():
+            return "locked"
+        return "active"
 
     def get_totp_uri(self):
         import pyotp
@@ -257,3 +295,17 @@ class AutomationRule(db.Model):
 
     def __repr__(self):
         return f"<AutomationRule {self.name}>"
+
+
+class SystemSetting(db.Model):
+    __tablename__ = "system_settings"
+
+    key = db.Column(db.String(64), primary_key=True)
+    value = db.Column(db.Text)
+    updated_at = db.Column(
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
+    updated_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+
+    def __repr__(self):
+        return f"<SystemSetting {self.key}={self.value!r}>"

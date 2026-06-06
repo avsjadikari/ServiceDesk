@@ -1,5 +1,6 @@
-from flask import Blueprint, render_template, redirect, url_for
+from flask import Blueprint, render_template, redirect, url_for, jsonify
 from flask_login import login_required, current_user
+from sqlalchemy import text
 from app import db
 from app.models import Ticket, Article, Asset
 from app.utils import (
@@ -9,6 +10,20 @@ from app.utils import (
 )
 
 main = Blueprint("main", __name__)
+
+
+@main.route("/health")
+def health():
+    return jsonify({"status": "ok"}), 200
+
+
+@main.route("/ready")
+def ready():
+    try:
+        db.session.execute(text("SELECT 1"))
+        return jsonify({"status": "ready"}), 200
+    except Exception as exc:
+        return jsonify({"status": "not-ready", "error": str(exc)}), 503
 
 
 @main.route("/")

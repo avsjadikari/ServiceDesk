@@ -5,6 +5,7 @@ __pycache__/
 *.so
 .Python
 venv/
+.venv/
 env/
 ENV/
 *.egg-info/
@@ -42,3 +43,14 @@ Thumbs.db
 
 # Cache
 .ruff_cache/
+
+# Nested embedded project copies (legacy artifact)
+ServiceDesk/
+
+# Generated artefacts
+.coverage
+htmlcov/
+
+# AI assistant working directories
+.claude/
+.qwen/

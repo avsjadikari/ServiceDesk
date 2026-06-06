@@ -1,3 +1,6 @@
+import os
+import re
+from datetime import datetime
 from flask import (
     Blueprint,
     render_template,
@@ -7,18 +10,21 @@ from flask import (
     flash,
     session,
     send_file,
-    jsonify,
     current_app,
 )
 from flask_login import login_user, current_user
-from app import db
+from sqlalchemy import text
+from app import db, _generate_temp_password
 from app.models import User, Article
 from app.forms import SetupForm
-from werkzeug.security import generate_password_hash
-import os
-from datetime import datetime
 
 setup = Blueprint("setup", __name__)
+
+_SAFE_IDENTIFIER = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
+
+
+def _is_dev_mode():
+    return os.environ.get("FLASK_CONFIG", "development") != "production"
 
 
 def save_config(db_type, db_host, db_port, db_name, db_user, db_password, company_name):
@@ -43,13 +49,11 @@ def save_config(db_type, db_host, db_port, db_name, db_user, db_password, compan
 
     if existing_config.get("SECRET_KEY"):
         config_lines.append(f"SECRET_KEY={existing_config['SECRET_KEY']}")
-    if existing_config.get("FLASK_ENV"):
-        config_lines.append(f"FLASK_ENV={existing_config['FLASK_ENV']}")
-    if existing_config.get("FLASK_DEBUG"):
-        config_lines.append(f"FLASK_DEBUG={existing_config['FLASK_DEBUG']}")
+    if existing_config.get("FLASK_CONFIG"):
+        config_lines.append(f"FLASK_CONFIG={existing_config['FLASK_CONFIG']}")
 
     with open(".env", "w") as f:
-        f.write("\n".join(config_lines))
+        f.write("\n".join(config_lines) + "\n")
 
 
 @setup.route("/setup", methods=["GET", "POST"])
@@ -59,7 +63,7 @@ def wizard():
         if admin_exists:
             session["setup_complete"] = True
             return redirect(url_for("main.index"))
-    except:
+    except Exception:
         pass
 
     form = SetupForm()
@@ -69,7 +73,7 @@ def wizard():
         admin_email = form.admin_email.data
         admin_password = form.admin_password.data
         admin_full_name = form.admin_full_name.data
-        company_name = form.company_name.data or "ServiceDesk"
+        company_name = (form.company_name.data or "ServiceDesk").strip()
 
         db_type = form.db_type.data
         db_host = form.db_host.data
@@ -82,21 +86,11 @@ def wizard():
             db_type, db_host, db_port, db_name, db_user, db_password, company_name
         )
 
-        try:
-            from sqlalchemy import text
+        db.create_all()
 
-            db.session.commit()
-            db.session.execute(text("DROP SCHEMA IF EXISTS public CASCADE"))
-            db.session.execute(text("CREATE SCHEMA public"))
-            db.session.commit()
-            db.create_all()
-        except Exception as e:
-            db.session.rollback()
-            try:
-                db.drop_all()
-                db.create_all()
-            except:
-                pass
+        from app.settings_store import set_company_name
+
+        set_company_name(company_name, user_id=None)
 
         admin = User(
             username=admin_username,
@@ -107,10 +101,11 @@ def wizard():
             is_active=True,
             must_change_password=True,
         )
-        admin.password_hash = generate_password_hash(admin_password)
+        admin.set_password(admin_password)
         db.session.add(admin)
         db.session.flush()
 
+        agent_pw = _generate_temp_password()
         agent = User(
             username="agent",
             email="agent@servicedesk.local",
@@ -120,9 +115,10 @@ def wizard():
             is_active=True,
             must_change_password=True,
         )
-        agent.password_hash = generate_password_hash("agent123")
+        agent.set_password(agent_pw)
         db.session.add(agent)
 
+        user_pw = _generate_temp_password()
         user = User(
             username="user",
             email="user@servicedesk.local",
@@ -132,31 +128,26 @@ def wizard():
             is_active=True,
             must_change_password=True,
         )
-        user.password_hash = generate_password_hash("user123")
+        user.set_password(user_pw)
         db.session.add(user)
 
         sample_articles = [
             Article(
                 title="How to Reset Your Password",
-                content="""# Password Reset Guide
-
-Follow these steps to reset your password:
-
-1. Go to the login page
-2. Click "Forgot Password"
-3. Enter your email address
-4. Check your inbox for reset link
-5. Create a new password
-
-## Requirements
-- At least 8 characters
-- Include uppercase and lowercase
-- Include a number
-- Include a special character
-
-## Common Issues
-- If you don't receive the email, check your spam folder
-- For immediate assistance, contact IT support""",
+                content=(
+                    "# Password Reset Guide\n\n"
+                    "Follow these steps to reset your password:\n\n"
+                    '1. Go to the login page\n2. Click "Forgot Password"\n'
+                    "3. Enter your email address\n"
+                    "4. Check your inbox for reset link\n"
+                    "5. Create a new password\n\n"
+                    "## Requirements\n- At least 8 characters\n"
+                    "- Include uppercase and lowercase\n"
+                    "- Include a number\n- Include a special character\n\n"
+                    "## Common Issues\n"
+                    "- If you don't receive the email, check your spam folder\n"
+                    "- For immediate assistance, contact IT support"
+                ),
                 category="Account/Access",
                 tags=["password", "reset", "security"],
                 status="published",
@@ -164,27 +155,17 @@ Follow these steps to reset your password:
             ),
             Article(
                 title="VPN Setup Guide",
-                content="""# Connecting to VPN
-
-## Prerequisites
-- Active directory credentials
-- VPN client installed
-
-## Steps to Connect
-
-1. Open the VPN client
-2. Enter server address: vpn.company.local
-3. Click Connect
-4. Enter your credentials
-5. Complete 2FA verification
-
-## Troubleshooting
-
-If you cannot connect:
-- Check your internet connection
-- Verify credentials are correct
-- Restart the VPN client
-- Contact IT support""",
+                content=(
+                    "# Connecting to VPN\n\n## Prerequisites\n"
+                    "- Active directory credentials\n- VPN client installed\n\n"
+                    "## Steps to Connect\n\n"
+                    "1. Open the VPN client\n2. Enter server address: vpn.company.local\n"
+                    "3. Click Connect\n4. Enter your credentials\n"
+                    "5. Complete 2FA verification\n\n## Troubleshooting\n\n"
+                    "If you cannot connect:\n- Check your internet connection\n"
+                    "- Verify credentials are correct\n- Restart the VPN client\n"
+                    "- Contact IT support"
+                ),
                 category="Network",
                 tags=["vpn", "remote", "network"],
                 status="published",
@@ -192,26 +173,19 @@ If you cannot connect:
             ),
             Article(
                 title="Requesting Software Installation",
-                content="""# Software Request Process
-
-## Approved Software
-The following software is pre-approved:
-- Microsoft Office Suite
-- Adobe Acrobat Reader
-- Chrome/Firefox browsers
-- 7-Zip
-- VLC Media Player
-
-## Request Process
-
-1. Log in to ServiceDesk
-2. Submit a new ticket
-3. Select "Software Request"
-4. Provide software name and business justification
-5. Wait for approval (24-48 hours)
-
-## Unapproved Software
-For software not in the approved list, manager approval is required.""",
+                content=(
+                    "# Software Request Process\n\n## Approved Software\n"
+                    "The following software is pre-approved:\n"
+                    "- Microsoft Office Suite\n- Adobe Acrobat Reader\n"
+                    "- Chrome/Firefox browsers\n- 7-Zip\n- VLC Media Player\n\n"
+                    "## Request Process\n\n"
+                    "1. Log in to ServiceDesk\n2. Submit a new ticket\n"
+                    '3. Select "Software Request"\n'
+                    "4. Provide software name and business justification\n"
+                    "5. Wait for approval (24-48 hours)\n\n"
+                    "## Unapproved Software\n"
+                    "For software not in the approved list, manager approval is required."
+                ),
                 category="Software",
                 tags=["software", "request", "installation"],
                 status="published",
@@ -219,23 +193,14 @@ For software not in the approved list, manager approval is required.""",
             ),
             Article(
                 title="Email Configuration Guide",
-                content="""# Email Configuration
-
-## Outlook Setup
-
-### Automatic Setup
-1. Open Outlook
-2. Enter your email address
-3. Click Connect
-4. Enter your password
-5. Complete 2FA if prompted
-
-### Manual Setup
-If automatic setup fails:
-- Server: outlook.office365.com
-- Port: 993
-- Encryption: SSL/TLS
-- IMAP or POP3 available""",
+                content=(
+                    "# Email Configuration\n\n## Outlook Setup\n\n"
+                    "### Automatic Setup\n1. Open Outlook\n2. Enter your email address\n"
+                    "3. Click Connect\n4. Enter your password\n5. Complete 2FA if prompted\n\n"
+                    "### Manual Setup\nIf automatic setup fails:\n"
+                    "- Server: outlook.office365.com\n- Port: 993\n"
+                    "- Encryption: SSL/TLS\n- IMAP or POP3 available"
+                ),
                 category="Email",
                 tags=["email", "outlook", "configuration"],
                 status="published",
@@ -243,23 +208,16 @@ If automatic setup fails:
             ),
             Article(
                 title="Network Drive Mapping",
-                content="""# Mapping Network Drives
-
-## Common Network Shares
-- S:\\ - Shared documents
-- T:\\ - Team folders
-- U:\\ - User home directory
-
-## How to Map
-1. Open File Explorer
-2. Right-click "This PC"
-3. Select "Map network drive"
-4. Choose a drive letter
-5. Enter the folder path
-6. Check "Reconnect at logon"
-
-## Access Issues
-Contact IT support if you cannot access your assigned drives.""",
+                content=(
+                    "# Mapping Network Drives\n\n## Common Network Shares\n"
+                    "- S:\\\\ - Shared documents\n- T:\\\\ - Team folders\n"
+                    "- U:\\\\ - User home directory\n\n## How to Map\n"
+                    "1. Open File Explorer\n2. Right-click \"This PC\"\n"
+                    "3. Select \"Map network drive\"\n4. Choose a drive letter\n"
+                    "5. Enter the folder path\n6. Check \"Reconnect at logon\"\n\n"
+                    "## Access Issues\n"
+                    "Contact IT support if you cannot access your assigned drives."
+                ),
                 category="Network",
                 tags=["network", "drive", "mapping"],
                 status="published",
@@ -274,9 +232,12 @@ Contact IT support if you cannot access your assigned drives.""",
 
         session["setup_complete"] = True
         session["company_name"] = company_name
+        session["setup_temp_passwords"] = {"agent": agent_pw, "user": user_pw}
 
         flash(
-            "Setup completed successfully! Restart the application to apply database changes.",
+            "Setup completed. Please log in. "
+            "Demo accounts (agent/user) were created with random temporary passwords "
+            "shown in the application logs; both must change their password on first login.",
             "success",
         )
         login_user(admin)
@@ -299,35 +260,40 @@ def db_init():
         flash("Access denied. Admin only.", "danger")
         return redirect(url_for("main.dashboard"))
 
+    if not _is_dev_mode():
+        flash(
+            "Database initialization via the web UI is disabled in production. "
+            "Use 'flask db upgrade' / 'flask db downgrade' on the server instead.",
+            "danger",
+        )
+        return redirect(url_for("main.dashboard"))
+
+    confirm = request.form.get("confirm", "")
+    if request.method == "POST" and confirm != "RESET":
+        flash("Confirmation phrase incorrect. Database was NOT modified.", "warning")
+        return redirect(url_for("setup.db_init"))
+
     if request.method == "POST":
         try:
-            from sqlalchemy import text
-            import re
-
             db.session.commit()
 
-            # Get database URI to determine database type
             db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
 
             if "postgresql" in db_uri:
-                # PostgreSQL syntax
                 db.session.execute(text("DROP SCHEMA public CASCADE"))
                 db.session.execute(text("CREATE SCHEMA public"))
             else:
-                # SQLite - delete all tables by dropping and recreating
-                # Get list of tables
-                result = db.session.execute(text("SELECT name FROM sqlite_master WHERE type='table'"))
+                result = db.session.execute(
+                    text("SELECT name FROM sqlite_master WHERE type='table'")
+                )
                 tables = [row[0] for row in result]
-
-                # Disable foreign keys temporarily
-                db.session.execute(text("PRAGMA foreign_keys = OFF"))
-
-                # Drop all tables
                 for table in tables:
+                    if not _SAFE_IDENTIFIER.match(table):
+                        current_app.logger.warning(
+                            "Skipping table drop for unsafe name: %s", table
+                        )
+                        continue
                     db.session.execute(text(f"DROP TABLE IF EXISTS {table}"))
-
-                # Re-enable foreign keys
-                db.session.execute(text("PRAGMA foreign_keys = ON"))
 
             db.session.commit()
 
@@ -340,6 +306,7 @@ def db_init():
             return redirect(url_for("setup.wizard"))
         except Exception as e:
             db.session.rollback()
+            current_app.logger.exception("Database re-init failed")
             flash(f"Error initializing database: {str(e)}", "danger")
 
     return render_template("setup/db_init.html")
@@ -353,10 +320,6 @@ def db_backup():
 
     try:
         db_uri = db.engine.url
-        db_name = db_uri.database
-        db_user = db_uri.username
-        db_host = db_uri.host
-
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
 
         if str(db_uri).startswith("sqlite"):
@@ -368,15 +331,16 @@ def db_backup():
                     download_name=f"servicedesk_backup_{timestamp}.db",
                     mimetype="application/x-sqlite3",
                 )
-            else:
-                flash("Database file not found", "danger")
+            flash("Database file not found", "danger")
         else:
             flash(
-                "Backup feature currently only supports SQLite. For PostgreSQL, use pg_dump manually.",
+                "Backup feature currently only supports SQLite. For PostgreSQL, "
+                "use 'pg_dump' on the server or your managed-database tooling.",
                 "warning",
             )
 
     except Exception as e:
+        current_app.logger.exception("Database backup failed")
         flash(f"Error creating backup: {str(e)}", "danger")
 
     return redirect(url_for("main.dashboard"))

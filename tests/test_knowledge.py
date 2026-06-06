@@ -33,7 +33,7 @@ class TestKnowledgeBase:
             assert article is not None
             assert article.status == "published"
 
-    def test_view_article(self, client, app, admin_user):
+    def test_view_article(self, client, app, db, admin_user):
         """Test viewing an article"""
         with app.app_context():
             client.post(
@@ -47,13 +47,13 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             response = client.get(f"/knowledge/{article.id}")
             assert response.status_code == 200
 
-    def test_search_articles(self, client, app, admin_user):
+    def test_search_articles(self, client, app, db, admin_user):
         """Test searching articles"""
         with app.app_context():
             client.post(
@@ -67,13 +67,13 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             response = client.get("/knowledge?search=VPN")
             assert response.status_code == 200
 
-    def test_edit_article(self, client, app, admin_user):
+    def test_edit_article(self, client, app, db, admin_user):
         """Test editing an article"""
         with app.app_context():
             client.post(
@@ -87,8 +87,8 @@ class TestKnowledgeBase:
                 author_id=admin_user.id,
                 status="published",
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             response = client.post(
                 f"/knowledge/{article.id}/edit",
@@ -107,7 +107,7 @@ class TestKnowledgeBase:
             article = Article.query.get(article.id)
             assert article.title == "Updated Title"
 
-    def test_view_count_increments(self, client, app, admin_user):
+    def test_view_count_increments(self, client, app, db, admin_user):
         """Test view count increments on viewing"""
         with app.app_context():
             client.post(
@@ -122,8 +122,8 @@ class TestKnowledgeBase:
                 status="published",
                 view_count=0,
             )
-            app.db.session.add(article)
-            app.db.session.commit()
+            db.session.add(article)
+            db.session.commit()
 
             client.get(f"/knowledge/{article.id}")
 

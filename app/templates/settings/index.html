@@ -1,0 +1,303 @@
+{% extends "base.html" %}
+
+{% block title %}System Settings - {{ company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h1><i class="bi bi-sliders me-2"></i>System Settings</h1>
+    <p class="text-muted mb-0">Manage organisation-wide branding and mail server.</p>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-building me-2"></i>Branding</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.index') }}">
+                    {{ form.hidden_tag() }}
+
+                    <div class="mb-3">
+                        {{ form.company_name.label(class="form-label") }}
+                        {{ form.company_name(class="form-control", autocomplete="off") }}
+                        {% if form.company_name.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.company_name.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.company_name.description }}</div>
+                    </div>
+
+                    <div class="alert alert-info small mb-3">
+                        <i class="bi bi-eye me-1"></i>
+                        Current display name:
+                        <strong>{{ company_name }}</strong>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>Save branding
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Branding history</h5>
+            </div>
+            <div class="card-body">
+                {% if history %}
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Old</th>
+                            <th>New</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in history %}
+                        <tr>
+                            <td class="small text-muted">
+                                {{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}
+                            </td>
+                            <td>{{ entry.details.get('old', '-') if entry.details else '-' }}</td>
+                            <td><strong>{{ entry.details.get('new', '-') if entry.details else '-' }}</strong></td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted text-center mb-0">No changes recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0"><i class="bi bi-envelope-at me-2"></i>Mail server</h5>
+                {% if mail_is_configured %}
+                    <span class="badge bg-success">Configured</span>
+                {% else %}
+                    <span class="badge bg-warning text-dark">Not configured</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% if not mail_is_configured %}
+                <div class="alert alert-warning small">
+                    <i class="bi bi-exclamation-triangle me-1"></i>
+                    Email is not configured. Password resets, ticket notifications
+                    and lock-out alerts will be skipped until you save valid
+                    credentials.
+                </div>
+                {% elif not mail_config.MAIL_DEFAULT_SENDER %}
+                <div class="alert alert-info small">
+                    <i class="bi bi-info-circle me-1"></i>
+                    No "Default sender" is set. Outgoing messages will use
+                    the SMTP username as the From address. Set one to control
+                    the display name (e.g. "ServiceDesk &lt;noreply@acme.com&gt;").
+                </div>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('settings.update_mail') }}">
+                    {{ mail_form.hidden_tag() }}
+
+                    <div class="accordion accordion-flush mb-3" id="mailHelp">
+                        <div class="accordion-item">
+                            <h2 class="accordion-header">
+                                <button class="accordion-button collapsed py-2 small"
+                                        type="button"
+                                        data-bs-toggle="collapse"
+                                        data-bs-target="#mailHelpBody">
+                                    <i class="bi bi-life-preserver me-2"></i>
+                                    How do I configure common mail providers?
+                                </button>
+                            </h2>
+                            <div id="mailHelpBody" class="accordion-collapse collapse"
+                                 data-bs-parent="#mailHelp">
+                                <div class="accordion-body small">
+                                    <p class="mb-2">
+                                        <strong>Gmail / Google Workspace</strong> &mdash;
+                                        Google no longer accepts account passwords for SMTP.
+                                        You need an <em>App Password</em>, which requires
+                                        2-Step Verification turned on first. If the
+                                        <em>App passwords</em> option is missing from your
+                                        Google account, 2-Step Verification is not
+                                        enabled &mdash; enable it, then revisit the
+                                        App Passwords page.
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Outlook / Office 365 / Hotmail</strong>
+                                        &mdash; Same restriction. Enable 2-Step Verification
+                                        and create an App Password at
+                                        <code>account.microsoft.com → Security → Advanced
+                                        options → App passwords</code>.
+                                    </p>
+                                    <p class="mb-2">
+                                        <strong>Yahoo</strong> &mdash; Account Key /
+                                        2-Step Verification required, then generate an
+                                        app password.
+                                    </p>
+                                    <p class="mb-0">
+                                        <strong>Easiest alternative</strong> &mdash; Use a
+                                        transactional email provider
+                                        (Mailgun, SendGrid, Brevo, Postmark, Amazon SES,
+                                        etc.) or your ISP's SMTP relay. These accept
+                                        ordinary username/password credentials and
+                                        typically use port 587 with TLS.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-8 mb-3">
+                            {{ mail_form.mail_server.label(class="form-label") }}
+                            {{ mail_form.mail_server(class="form-control", placeholder="smtp.gmail.com", autocomplete="off") }}
+                            {% if mail_form.mail_server.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in mail_form.mail_server.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                            <div class="form-text">{{ mail_form.mail_server.description }}</div>
+                        </div>
+                        <div class="col-md-4 mb-3">
+                            {{ mail_form.mail_port.label(class="form-label") }}
+                            {{ mail_form.mail_port(class="form-control", placeholder="587") }}
+                            {% if mail_form.mail_port.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in mail_form.mail_port.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-3 form-check">
+                        {{ mail_form.mail_use_tls(class="form-check-input") }}
+                        {{ mail_form.mail_use_tls.label(class="form-check-label") }}
+                    </div>
+
+                    <div class="row">
+                        <div class="col-md-6 mb-3">
+                            {{ mail_form.mail_username.label(class="form-label") }}
+                            {{ mail_form.mail_username(class="form-control", placeholder="noreply@acme.com", autocomplete="off") }}
+                            {% if mail_form.mail_username.errors %}
+                                <div class="text-danger small mt-1">
+                                    {% for error in mail_form.mail_username.errors %}{{ error }}{% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                        <div class="col-md-6 mb-3">
+                            {{ mail_form.mail_password.label(class="form-label") }}
+                            <div class="input-group">
+                                {{ mail_form.mail_password(class="form-control", placeholder="(unchanged)", autocomplete="new-password", id="mail_password_field") }}
+                                <button class="btn btn-outline-secondary" type="button"
+                                        onclick="var f=document.getElementById('mail_password_field'); f.type = f.type==='password' ? 'text' : 'password'; this.innerHTML = f.type==='password' ? '<i class=\\'bi bi-eye\\'></i>' : '<i class=\\'bi bi-eye-slash\\'></i>';">
+                                    <i class="bi bi-eye"></i>
+                                </button>
+                            </div>
+                            {% if mail_masked_password %}
+                            <div class="form-text">
+                                Currently stored: <code>{{ mail_masked_password }}</code>
+                            </div>
+                            {% endif %}
+                            <div class="form-text">
+                                <i class="bi bi-info-circle me-1"></i>
+                                Spaces are stripped automatically. Google, Microsoft
+                                and Yahoo display App Passwords as four 4-character
+                                groups (e.g. <code>abcd efgh ijkl mnop</code>) &mdash;
+                                paste them with or without spaces; the saved value
+                                is the 16-character form with no spaces.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
+                        {{ mail_form.mail_default_sender.label(class="form-label") }}
+                        {{ mail_form.mail_default_sender(class="form-control", placeholder="noreply@acme.com", autocomplete="off") }}
+                        {% if mail_form.mail_default_sender.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in mail_form.mail_default_sender.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">{{ mail_form.mail_default_sender.description }}</div>
+                    </div>
+
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-save me-1"></i>Save mail settings
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-send-check me-2"></i>Send test email</h5>
+            </div>
+            <div class="card-body">
+                <form method="POST" action="{{ url_for('settings.test_mail') }}">
+                    {{ test_email_form.hidden_tag() }}
+                    <div class="mb-3">
+                        {{ test_email_form.recipient.label(class="form-label") }}
+                        {{ test_email_form.recipient(class="form-control", placeholder="you@example.com") }}
+                        {% if test_email_form.recipient.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in test_email_form.recipient.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">
+                            Sends a real SMTP message using the saved settings. The
+                            application log will record the result regardless.
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-outline-primary"
+                            {% if not mail_is_configured %}disabled{% endif %}>
+                        <i class="bi bi-send me-1"></i>Send test email
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Mail config history</h5>
+            </div>
+            <div class="card-body">
+                {% set mail_history = mail_history or [] %}
+                {% if mail_history %}
+                <table class="table table-sm mb-0">
+                    <thead>
+                        <tr>
+                            <th>When</th>
+                            <th>Changed</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for entry in mail_history %}
+                        <tr>
+                            <td class="small text-muted">
+                                {{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}
+                            </td>
+                            <td class="small">
+                                {% if entry.details %}
+                                    {% for k, v in entry.details.items() %}{% if v %}<span class="badge bg-secondary me-1">{{ k }}</span>{% endif %}{% endfor %}
+                                {% else %}
+                                    -
+                                {% endif %}
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% else %}
+                <p class="text-muted text-center mb-0">No changes recorded yet.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

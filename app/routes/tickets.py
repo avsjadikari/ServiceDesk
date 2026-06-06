@@ -1,16 +1,31 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
-from flask_login import login_required, current_user
+import os
+import uuid
 from datetime import datetime
+
+from flask import (
+    Blueprint,
+    abort,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    send_file,
+    url_for,
+)
+from flask_login import current_user, login_required
+from werkzeug.utils import secure_filename
+
 from app import db
-from app.models import Ticket, Comment, User, Asset
-from app.forms import TicketForm, TicketFilterForm, CommentForm
+from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
+from app.models import Attachment, Comment, Ticket, User
 from app.utils import (
-    generate_ticket_number,
-    calculate_sla_deadline,
-    log_audit,
     apply_automation_rules,
-    get_status_color,
+    calculate_sla_deadline,
+    generate_ticket_number,
     get_priority_color,
+    get_status_color,
+    log_audit,
 )
 
 tickets = Blueprint("tickets", __name__)
@@ -83,12 +98,9 @@ def new():
 
         apply_automation_rules(ticket, "ticket_created")
 
-        try:
-            from app.email_utils import send_ticket_created
+        from app.email_utils import send_ticket_created
 
-            send_ticket_created(ticket)
-        except Exception as e:
-            pass
+        send_ticket_created(ticket)
 
         flash(f"Ticket {ticket.ticket_number} created successfully.", "success")
 
@@ -121,6 +133,7 @@ def view(ticket_id):
         "tickets/view.html",
         ticket=ticket,
         comment_form=comment_form,
+        attachment_form=AttachmentForm(),
         comments=comments,
         status_color=status_color,
         priority_color=priority_color,
@@ -198,12 +211,9 @@ def update_status(ticket_id):
             {"old_status": old_status, "new_status": new_status},
         )
 
-        try:
-            from app.email_utils import send_ticket_status_changed
+        from app.email_utils import send_ticket_status_changed
 
-            send_ticket_status_changed(ticket, old_status, new_status)
-        except Exception as e:
-            pass
+        send_ticket_status_changed(ticket, old_status, new_status)
 
         flash(f"Ticket status updated to {new_status}.", "success")
 
@@ -234,12 +244,9 @@ def assign(ticket_id):
             {"assigned_to": assignee_id},
         )
 
-        try:
-            from app.email_utils import send_ticket_assigned
+        from app.email_utils import send_ticket_assigned
 
-            send_ticket_assigned(ticket)
-        except Exception as e:
-            pass
+        send_ticket_assigned(ticket)
 
         flash(
             f"Ticket assigned to {ticket.assignee.full_name if ticket.assignee else 'Unknown'}.",
@@ -270,12 +277,9 @@ def add_comment(ticket_id):
 
         log_audit(current_user.id, "comment", "ticket", ticket.id, ticket.id)
 
-        try:
-            from app.email_utils import send_ticket_comment
+        from app.email_utils import send_ticket_comment
 
-            send_ticket_comment(ticket, comment)
-        except Exception as e:
-            pass
+        send_ticket_comment(ticket, comment)
 
         flash("Comment added successfully.", "success")
 
@@ -307,3 +311,141 @@ def link_asset(ticket_id):
         flash("Asset linked successfully.", "success")
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+
+def _can_view_ticket(ticket):
+    """A user can view a ticket if they are the reporter, an agent/admin,
+    or the assignee."""
+    if not current_user.is_authenticated:
+        return False
+    if current_user.is_agent():
+        return True
+    return ticket.reporter_id == current_user.id
+
+
+def _attachment_allowed(filename, mime_type):
+    """Validate the upload extension and MIME prefix against app config."""
+    if not filename:
+        return False
+    safe_name = secure_filename(filename)
+    if not safe_name or "." not in safe_name:
+        return False
+    ext = safe_name.rsplit(".", 1)[-1].lower()
+    allowed_exts = current_app.config.get("UPLOAD_ALLOWED_EXTENSIONS") or set()
+    allowed_mimes = current_app.config.get("UPLOAD_ALLOWED_MIME_PREFIXES") or []
+    if ext not in allowed_exts:
+        return False
+    if mime_type and not any(
+        mime_type.startswith(prefix) for prefix in allowed_mimes
+    ):
+        return False
+    return True
+
+
+@tickets.route("/tickets/<int:ticket_id>/attachments", methods=["POST"])
+@login_required
+def upload_attachment(ticket_id):
+    ticket = Ticket.query.get_or_404(ticket_id)
+    if not _can_view_ticket(ticket):
+        abort(403)
+
+    form = AttachmentForm()
+    if not form.validate_on_submit():
+        for _, errors in form.errors.items():
+            for err in errors:
+                flash(err, "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    f = form.file.data
+    if not f or not f.filename:
+        flash("No file selected.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    max_bytes = current_app.config.get("MAX_CONTENT_LENGTH")
+    if max_bytes and f.content_length and f.content_length > max_bytes:
+        flash("File is too large.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    if not _attachment_allowed(f.filename, f.mimetype):
+        flash("This file type is not allowed.", "danger")
+        current_app.logger.warning(
+            "Rejected attachment upload user_id=%s ticket_id=%s "
+            "filename=%s mime=%s",
+            current_user.id,
+            ticket.id,
+            f.filename,
+            f.mimetype,
+        )
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    safe_name = secure_filename(f.filename)
+    unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+    upload_dir = current_app.config.get("UPLOAD_FOLDER")
+    os.makedirs(upload_dir, exist_ok=True)
+    dest_path = os.path.join(upload_dir, unique_name)
+    # Make sure the resolved path stays inside the upload directory.
+    real_dir = os.path.realpath(upload_dir)
+    real_path = os.path.realpath(dest_path)
+    if not real_path.startswith(real_dir + os.sep):
+        flash("Invalid filename.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    f.save(dest_path)
+    file_size = os.path.getsize(dest_path)
+
+    attachment = Attachment(
+        ticket_id=ticket.id,
+        filename=safe_name,
+        filepath=unique_name,
+        file_size=file_size,
+        mime_type=f.mimetype,
+        uploaded_by=current_user.id,
+    )
+    db.session.add(attachment)
+    db.session.commit()
+
+    log_audit(
+        current_user.id,
+        "upload_attachment",
+        "ticket",
+        ticket.id,
+        ticket.id,
+        {"filename": safe_name, "size": file_size},
+    )
+    flash("File uploaded successfully.", "success")
+    return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+
+@tickets.route("/attachments/<int:attachment_id>")
+@login_required
+def download_attachment(attachment_id):
+    attachment = Attachment.query.get_or_404(attachment_id)
+    ticket = attachment.ticket
+    if not _can_view_ticket(ticket):
+        abort(403)
+
+    upload_dir = current_app.config.get("UPLOAD_FOLDER")
+    real_dir = os.path.realpath(upload_dir)
+    file_path = os.path.realpath(os.path.join(upload_dir, attachment.filepath))
+    if not file_path.startswith(real_dir + os.sep):
+        current_app.logger.error(
+            "Attachment path traversal blocked: %s", attachment.filepath
+        )
+        abort(404)
+    if not os.path.isfile(file_path):
+        abort(404)
+
+    log_audit(
+        current_user.id,
+        "download_attachment",
+        "ticket",
+        ticket.id,
+        ticket.id,
+        {"filename": attachment.filename},
+    )
+    return send_file(
+        file_path,
+        as_attachment=True,
+        download_name=attachment.filename,
+        mimetype=attachment.mime_type or "application/octet-stream",
+    )

@@ -1,0 +1,51 @@
+# Build / cache artefacts
+.git
+.gitignore
+.github
+.claude
+.cline
+.qwen
+.venv
+venv
+env
+ENV
+__pycache__
+**/__pycache__
+*.py[cod]
+*.egg-info
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+.coverage.*
+
+# Local dev artefacts
+.env
+.env.local
+.env.*.local
+*.db
+*.sqlite
+*.sqlite3
+instance/*
+!instance/.gitkeep
+uploads/*
+!uploads/.gitkeep
+
+# Docs (kept in repo, but you may exclude in CI builds)
+# README.md
+# SPEC.md
+# SECURITY.md
+
+# Test output
+tests
+docs
+
+# Editor
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+
+# Nested legacy copy
+ServiceDesk/

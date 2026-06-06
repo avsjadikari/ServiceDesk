@@ -1,0 +1,99 @@
+# Local development / single-host production stack.
+# Usage:
+#   cp .env.example .env && $EDITOR .env
+#   docker compose up -d --build
+#   docker compose exec web flask db upgrade   # first run only (entrypoint also runs this)
+#   docker compose logs -f web
+
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-servicedesk}
+      POSTGRES_USER: ${DB_USER:-servicedesk}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required in .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-servicedesk} -d ${DB_NAME:-servicedesk}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      FLASK_CONFIG: production
+      SECRET_KEY: ${SECRET_KEY:?SECRET_KEY is required in .env}
+      DB_TYPE: postgresql
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-servicedesk}
+      DB_USER: ${DB_USER:-servicedesk}
+      DB_PASSWORD: ${DB_PASSWORD:?DB_PASSWORD is required in .env}
+      REDIS_URL: redis://redis:6379/0
+      MAIL_SERVER: ${MAIL_SERVER:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USE_TLS: ${MAIL_USE_TLS:-true}
+      MAIL_USERNAME: ${MAIL_USERNAME:-}
+      MAIL_PASSWORD: ${MAIL_PASSWORD:-}
+      COMPANY_NAME: ${COMPANY_NAME:-ServiceDesk}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_THREADS: ${GUNICORN_THREADS:-2}
+      TALISMAN_FORCE_HTTPS: ${TALISMAN_FORCE_HTTPS:-true}
+    volumes:
+      - app-uploads:/app/uploads
+      - app-instance:/app/instance
+    ports:
+      - "${BIND_ADDRESS:-127.0.0.1}:8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  # Optional: nginx reverse proxy for TLS termination.
+  # Enable by setting ENABLE_NGINX=true in .env and bringing it up with
+  #   docker compose --profile proxy up -d
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    profiles: ["proxy"]
+    depends_on:
+      web:
+        condition: service_healthy
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./docker/certs:/etc/nginx/certs:ro
+    # Provide TLS cert+key at docker/certs/fullchain.pem and docker/certs/privkey.pem
+
+volumes:
+  pgdata:
+  redisdata:
+  app-uploads:
+  app-instance:

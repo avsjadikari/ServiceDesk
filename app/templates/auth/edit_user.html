@@ -11,16 +11,26 @@
     <div class="card-body">
         <form method="POST">
             {{ form.hidden_tag() }}
-            
+
             <div class="row">
                 <div class="col-md-6 mb-3">
                     {{ form.username.label(class="form-label") }}
                     {{ form.username(class="form-control") }}
+                    {% if form.username.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.username.errors %}{{ error }}{% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
-                
+
                 <div class="col-md-6 mb-3">
                     {{ form.email.label(class="form-label") }}
                     {{ form.email(class="form-control") }}
+                    {% if form.email.errors %}
+                        <div class="text-danger small mt-1">
+                            {% for error in form.email.errors %}{{ error }}{% endfor %}
+                        </div>
+                    {% endif %}
                 </div>
             </div>
             

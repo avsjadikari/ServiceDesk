@@ -1,6 +1,6 @@
 import re
 from datetime import datetime, timedelta
-from flask import current_app
+from flask import current_app, has_request_context, request
 from app import db
 from app.models import Ticket, AuditLog, User
 
@@ -23,6 +23,12 @@ def calculate_sla_deadline(priority):
     return datetime.utcnow() + timedelta(hours=24)
 
 
+def _client_ip():
+    if not has_request_context():
+        return None
+    return request.headers.get("X-Forwarded-For", request.remote_addr)
+
+
 def log_audit(
     user_id,
     action,
@@ -31,7 +37,10 @@ def log_audit(
     ticket_id=None,
     details=None,
     ip_address=None,
+    commit=True,
 ):
+    """Add an AuditLog row. By default commits; pass commit=False when the
+    caller wants the audit row to share the surrounding transaction."""
     log = AuditLog(
         user_id=user_id,
         action=action,
@@ -39,10 +48,11 @@ def log_audit(
         entity_id=entity_id,
         ticket_id=ticket_id,
         details=details,
-        ip_address=ip_address,
+        ip_address=ip_address or _client_ip(),
     )
     db.session.add(log)
-    db.session.commit()
+    if commit:
+        db.session.commit()
 
 
 def get_status_color(status):

@@ -1,0 +1,25 @@
+[MASTER]
+disable=
+    not-callable,
+    import-outside-toplevel,
+    broad-except,
+    bare-except,
+    too-few-public-methods,
+    too-many-arguments,
+    too-many-locals,
+    too-many-branches,
+    too-many-statements,
+    too-many-instance-attributes,
+    line-too-long,
+    missing-docstring,
+    invalid-name,
+    protected-access,
+    unused-argument,
+    unused-variable,
+    redefined-outer-name,
+    unspecified-encoding,
+    consider-using-f-string,
+    wrong-import-order
+
+[REPORTS]
+score=no

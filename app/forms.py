@@ -7,21 +7,36 @@ from wtforms import (
     TextAreaField,
     DateField,
     IntegerField,
+    FileField,
 )
 from wtforms.validators import (
     DataRequired,
     Email,
     EqualTo,
     Length,
+    NumberRange,
     Optional,
-    ValidationError,
     Regexp,
+    ValidationError,
 )
 from app.models import User
+from app import db
+
+
+_PASSWORD_REGEX_MSG = (
+    "Password must contain at least: 1 uppercase, 1 lowercase, "
+    "1 number, 1 special character (@$!%*?&)"
+)
+_PASSWORD_REGEX = (
+    r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]"
+)
 
 
 class SetupForm(FlaskForm):
-    company_name = StringField("Company Name", validators=[Optional()])
+    company_name = StringField(
+        "Company Name",
+        validators=[DataRequired(), Length(min=2, max=64)],
+    )
 
     db_type = SelectField(
         "Database Type",
@@ -119,6 +134,26 @@ class UserEditForm(FlaskForm):
         "Role", choices=[("user", "User"), ("agent", "Agent"), ("admin", "Admin")]
     )
     is_active = BooleanField("Active")
+
+    def __init__(self, *args, editing_user_id=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._editing_user_id = editing_user_id
+
+    def validate_username(self, username):
+        query = User.query.filter(
+            db.func.lower(User.username) == username.data.lower()
+        )
+        if self._editing_user_id is not None:
+            query = query.filter(User.id != self._editing_user_id)
+        if query.first():
+            raise ValidationError("Username already exists.")
+
+    def validate_email(self, email):
+        query = User.query.filter(db.func.lower(User.email) == email.data.lower())
+        if self._editing_user_id is not None:
+            query = query.filter(User.id != self._editing_user_id)
+        if query.first():
+            raise ValidationError("Email already registered.")
 
 
 class TicketForm(FlaskForm):
@@ -309,3 +344,93 @@ class AutomationRuleForm(FlaskForm):
         ],
     )
     is_active = BooleanField("Active")
+
+
+class ForgotPasswordForm(FlaskForm):
+    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=120)])
+
+
+class ResetPasswordForm(FlaskForm):
+    new_password = PasswordField(
+        "New Password",
+        validators=[
+            DataRequired(),
+            Length(min=8, max=128),
+            Regexp(_PASSWORD_REGEX, message=_PASSWORD_REGEX_MSG),
+        ],
+    )
+    confirm_password = PasswordField(
+        "Confirm New Password",
+        validators=[DataRequired(), EqualTo("new_password")],
+    )
+
+
+class AttachmentForm(FlaskForm):
+    file = FileField(
+        "File",
+        validators=[
+            DataRequired(),
+        ],
+    )
+
+
+class AdminResetPasswordForm(FlaskForm):
+    """Confirmation form for an admin-initiated password reset.
+
+    The new password is generated server-side (never typed by the admin)
+    and is emailed to the user, so this form only carries the policy
+    checkbox.
+    """
+    must_change_password = BooleanField(
+        "Force user to change password on next login",
+        default=True,
+    )
+
+
+class SystemSettingsForm(FlaskForm):
+    company_name = StringField(
+        "Company name",
+        validators=[DataRequired(), Length(min=2, max=64)],
+        description=(
+            "Displayed as \"<value> ServiceDesk\" on every page and dashboard."
+        ),
+    )
+
+
+class MailSettingsForm(FlaskForm):
+    mail_server = StringField(
+        "SMTP server",
+        validators=[Optional(), Length(max=255)],
+        description="Hostname of your SMTP relay (e.g. smtp.gmail.com).",
+    )
+    mail_port = IntegerField(
+        "SMTP port",
+        validators=[Optional(), NumberRange(min=1, max=65535)],
+        description="Common values: 25, 465 (SSL), 587 (TLS).",
+    )
+    mail_use_tls = BooleanField("Use TLS/STARTTLS")
+    mail_username = StringField(
+        "Username",
+        validators=[Optional(), Length(max=255)],
+        description="Usually your full email address.",
+    )
+    mail_password = PasswordField(
+        "Password",
+        validators=[Optional(), Length(max=255)],
+        description="For Gmail/Outlook use an app password.",
+    )
+    mail_default_sender = StringField(
+        "Default sender",
+        validators=[Optional(), Length(max=255)],
+        description=(
+            "From-address shown to recipients. Either a plain email "
+            "(noreply@acme.com) or 'Name <noreply@acme.com>'."
+        ),
+    )
+
+
+class TestEmailForm(FlaskForm):
+    recipient = StringField(
+        "Send test email to",
+        validators=[DataRequired(), Email(), Length(max=255)],
+    )

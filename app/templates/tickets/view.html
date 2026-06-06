@@ -24,7 +24,7 @@
                 <h5 class="mb-0">Description</h5>
             </div>
             <div class="card-body">
-                <p style="white-space: pre-wrap;">{{ ticket.description }}</p>
+                <p style="white-space: pre-wrap;">{{ ticket.description | markdown_safe }}</p>
             </div>
         </div>
         
@@ -42,7 +42,7 @@
                     {% if comment.is_internal %}
                     <span class="badge bg-warning mb-2">Internal Note</span>
                     {% endif %}
-                    <p class="mb-0" style="white-space: pre-wrap;">{{ comment.content }}</p>
+                    <p class="mb-0" style="white-space: pre-wrap;">{{ comment.content | markdown_safe }}</p>
                 </div>
                 {% endfor %}
                 
@@ -64,6 +64,50 @@
                     </div>
                     {% endif %}
                     <button type="submit" class="btn btn-primary">Add Comment</button>
+                </form>
+            </div>
+        </div>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Attachments</h5>
+            </div>
+            <div class="card-body">
+                {% if ticket.attachments %}
+                <ul class="list-group list-group-flush mb-3">
+                    {% for attachment in ticket.attachments %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                        <div>
+                            <i class="bi bi-paperclip me-2"></i>
+                            <a href="{{ url_for('tickets.download_attachment', attachment_id=attachment.id) }}">
+                                {{ attachment.filename }}
+                            </a>
+                            <span class="text-muted small ms-2">
+                                {{ (attachment.file_size / 1024) | round(1) }} KB
+                                &middot; {{ attachment.created_at.strftime('%Y-%m-%d %H:%M') if attachment.created_at else '' }}
+                            </span>
+                        </div>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <p class="text-muted text-center mb-3">No attachments</p>
+                {% endif %}
+
+                <form method="POST" action="{{ url_for('tickets.upload_attachment', ticket_id=ticket.id) }}" enctype="multipart/form-data">
+                    {{ attachment_form.hidden_tag() }}
+                    <div class="input-group">
+                        {{ attachment_form.file(class="form-control", accept=".png,.jpg,.jpeg,.gif,.pdf,.txt,.csv,.log,.md,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.odt,.ods,.odp,.zip,.gz,.tar") }}
+                        <button type="submit" class="btn btn-outline-primary">
+                            <i class="bi bi-upload me-1"></i>Upload
+                        </button>
+                    </div>
+                    {% if attachment_form.file.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in attachment_form.file.errors %}{{ error }}{% endfor %}
+                    </div>
+                    {% endif %}
+                    <div class="form-text">Max 16 MB. Allowed: images, PDF, Office, ODF, archives, plain text.</div>
                 </form>
             </div>
         </div>

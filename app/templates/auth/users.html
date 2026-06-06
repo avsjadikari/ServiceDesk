@@ -12,7 +12,7 @@
 
 <div class="card">
     <div class="card-body">
-        <table class="table table-hover">
+        <table class="table table-hover align-middle">
             <thead>
                 <tr>
                     <th>Username</th>
@@ -21,13 +21,18 @@
                     <th>Department</th>
                     <th>Role</th>
                     <th>Status</th>
-                    <th>Actions</th>
+                    <th class="text-end">Actions</th>
                 </tr>
             </thead>
             <tbody>
                 {% for user in users %}
                 <tr>
-                    <td>{{ user.username }}</td>
+                    <td>
+                        <strong>{{ user.username }}</strong>
+                        {% if user.id == current_user.id %}
+                            <span class="badge bg-info ms-1">you</span>
+                        {% endif %}
+                    </td>
                     <td>{{ user.full_name }}</td>
                     <td>{{ user.email }}</td>
                     <td>{{ user.department or '-' }}</td>
@@ -37,16 +42,83 @@
                         </span>
                     </td>
                     <td>
-                        {% if user.is_active %}
-                        <span class="badge bg-success">Active</span>
+                        {% if user.account_status == 'active' %}
+                            <span class="badge bg-success">Active</span>
+                        {% elif user.account_status == 'locked' %}
+                            <span class="badge bg-warning text-dark">
+                                Locked
+                                {% if user.locked_until %}
+                                <span class="small">
+                                    until {{ user.locked_until.strftime('%Y-%m-%d %H:%M') }}
+                                </span>
+                                {% endif %}
+                            </span>
                         {% else %}
-                        <span class="badge bg-secondary">Inactive</span>
+                            <span class="badge bg-secondary">Disabled</span>
                         {% endif %}
                     </td>
-                    <td>
-                        <a href="{{ url_for('auth.edit_user', user_id=user.id) }}" class="btn btn-sm btn-outline-primary">
-                            <i class="bi bi-pencil"></i>
-                        </a>
+                    <td class="text-end">
+                        <div class="btn-group btn-group-sm" role="group">
+                            <a href="{{ url_for('auth.edit_user', user_id=user.id) }}"
+                               class="btn btn-outline-primary"
+                               title="Edit profile">
+                                <i class="bi bi-pencil"></i>
+                            </a>
+                            <a href="{{ url_for('auth.admin_reset_password', user_id=user.id) }}"
+                               class="btn btn-outline-secondary"
+                               title="Reset password">
+                                <i class="bi bi-key"></i>
+                            </a>
+
+                            {% if user.account_status == 'disabled' %}
+                                <form method="POST"
+                                      action="{{ url_for('auth.enable_user', user_id=user.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Re-enable {{ user.username }}?');">
+                                    <button type="submit"
+                                            class="btn btn-outline-success"
+                                            title="Enable account">
+                                        <i class="bi bi-check-circle"></i>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form method="POST"
+                                      action="{{ url_for('auth.disable_user', user_id=user.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Disable {{ user.username }}? They will not be able to sign in.');">
+                                    <button type="submit"
+                                            class="btn btn-outline-warning"
+                                            title="Disable account">
+                                        <i class="bi bi-slash-circle"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+
+                            {% if user.account_status == 'locked' %}
+                                <form method="POST"
+                                      action="{{ url_for('auth.unlock_user', user_id=user.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Unlock {{ user.username }}?');">
+                                    <button type="submit"
+                                            class="btn btn-outline-success"
+                                            title="Unlock account">
+                                        <i class="bi bi-unlock"></i>
+                                    </button>
+                                </form>
+                            {% else %}
+                                <form method="POST"
+                                      action="{{ url_for('auth.lock_user', user_id=user.id) }}"
+                                      class="d-inline"
+                                      onsubmit="return confirm('Lock {{ user.username }} for 60 minutes?');">
+                                    <input type="hidden" name="minutes" value="60">
+                                    <button type="submit"
+                                            class="btn btn-outline-danger"
+                                            title="Lock account for 60 min">
+                                        <i class="bi bi-lock"></i>
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
                     </td>
                 </tr>
                 {% endfor %}
