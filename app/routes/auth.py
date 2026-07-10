@@ -22,7 +22,7 @@ from app.forms import (
     ResetPasswordForm,
     UserEditForm,
 )
-from app.models import User
+from app.models import User, RecoveryCode
 from app.security import generate_password_reset_token, verify_password_reset_token
 from app.utils import log_audit
 
@@ -140,14 +140,41 @@ def login_2fa():
         flash("User not found. Please login again.", "danger")
         return redirect(url_for("auth.login"))
 
+    use_recovery = request.form.get("use_recovery")
+
     if request.method == "POST":
-        code = request.form.get("code", "").strip()
-        if user.verify_totp(code):
-            remember_me = session.get("remember_me", False)
-            session.pop("pre_2fa_user_id", None)
-            session.pop("remember_me", None)
-            return complete_login(user, remember_me)
-        flash("Invalid verification code. Please try again.", "danger")
+        if use_recovery:
+            recovery_code = request.form.get("recovery_code", "").strip().upper()
+            if not recovery_code:
+                flash("Please enter a recovery code.", "danger")
+                return render_template("auth/login_2fa.html", user=user)
+
+            from werkzeug.security import check_password_hash
+
+            codes = RecoveryCode.query.filter_by(user_id=user.id, used=False).all()
+            matched_code = None
+            for rc in codes:
+                if check_password_hash(rc.code_hash, recovery_code):
+                    matched_code = rc
+                    break
+
+            if matched_code:
+                matched_code.used = True
+                db.session.commit()
+                remember_me = session.get("remember_me", False)
+                session.pop("pre_2fa_user_id", None)
+                session.pop("remember_me", None)
+                log_audit(user.id, "recovery_code_used", "user", user.id)
+                return complete_login(user, remember_me)
+            flash("Invalid recovery code. Please try again.", "danger")
+        else:
+            code = request.form.get("code", "").strip()
+            if user.verify_totp(code):
+                remember_me = session.get("remember_me", False)
+                session.pop("pre_2fa_user_id", None)
+                session.pop("remember_me", None)
+                return complete_login(user, remember_me)
+            flash("Invalid verification code. Please try again.", "danger")
 
     return render_template("auth/login_2fa.html", user=user)
 
@@ -657,6 +684,24 @@ def unlock_user(user_id):
     return redirect(url_for("auth.users"))
 
 
+def _generate_recovery_codes(user):
+    """Generate 8 one-time recovery codes, store hashed, return plaintext list."""
+    import secrets as _secrets
+    from werkzeug.security import generate_password_hash
+
+    plaintext_codes = []
+    for _ in range(8):
+        code = _secrets.token_uppercase(10)
+        plaintext_codes.append(code)
+        rc = RecoveryCode(
+            user_id=user.id,
+            code_hash=generate_password_hash(code),
+        )
+        db.session.add(rc)
+    db.session.commit()
+    return plaintext_codes
+
+
 @auth.route("/profile/2fa/setup", methods=["GET", "POST"])
 @login_required
 def setup_2fa():
@@ -681,9 +726,14 @@ def setup_2fa():
 
             send_2fa_enabled(current_user)
 
+            recovery_codes = _generate_recovery_codes(current_user)
+
             log_audit(current_user.id, "2fa_enabled", "user", current_user.id)
             flash("Two-factor authentication enabled successfully!", "success")
-            return redirect(url_for("auth.profile"))
+            return render_template(
+                "auth/recovery_codes.html",
+                recovery_codes=recovery_codes,
+            )
         flash("Invalid verification code. Please try again.", "danger")
 
     if not current_user.two_factor_secret:
@@ -718,6 +768,7 @@ def disable_2fa():
         return redirect(url_for("auth.profile"))
 
     current_user.two_factor_enabled = False
+    RecoveryCode.query.filter_by(user_id=current_user.id, used=False).update({"used": True})
     db.session.commit()
 
     from app.email_utils import send_2fa_disabled

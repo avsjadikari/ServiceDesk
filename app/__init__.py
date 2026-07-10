@@ -249,12 +249,12 @@ def create_app(config_name=None):
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(settings_bp)
 
-    # Initialise Flask-Mail and overlay DB-stored mail settings on top of
-    # the env-var defaults so admins can change the mail server at runtime.
+    # Apply DB-stored mail settings first so Flask-Mail picks them up.
+    # Flask-Mail 0.9.1 caches config at init_app time, so the values
+    # must already be on app.config before we call init_mail.
     from app.email_utils import init_mail as _init_mail
     from app.settings_store import apply_mail_config, get_mail_config
 
-    _init_mail(app)
     with app.app_context():
         try:
             apply_mail_config(app)
@@ -264,6 +264,8 @@ def create_app(config_name=None):
         except Exception:
             current_app_logger = __import__("logging").getLogger("app")
             current_app_logger.exception("apply_mail_config failed at startup")
+
+    _init_mail(app)
 
     @app.before_request
     def check_setup():

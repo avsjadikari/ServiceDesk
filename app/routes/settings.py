@@ -124,9 +124,15 @@ def update_mail():
     set_mail_config(new_values, user_id=current_user.id)
 
     # Push the new values onto the live app so subsequent requests use
-    # them without a restart.
+    # them without a restart.  Also refresh Flask-Mail's cached state
+    # because it captures config at init_app time.
     try:
         apply_mail_config(current_app._get_current_object())
+        from app.email_utils import mail as _mail
+        _state = getattr(_mail, "state", None)
+        if _state is not None:
+            _state.username = current_app.config.get("MAIL_USERNAME")
+            _state.password = current_app.config.get("MAIL_PASSWORD")
     except Exception:
         current_app.logger.exception("apply_mail_config failed after save")
 

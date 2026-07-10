@@ -11,27 +11,44 @@
                     <div class="text-center mb-4">
                         <i class="bi bi-shield-lock" style="font-size: 3rem; color: var(--primary);"></i>
                         <h3 class="mt-3">Two-Factor Authentication</h3>
-                        <p class="text-muted">Enter the 6-digit code from your authenticator app</p>
+                        <p class="text-muted" id="totpPrompt">Enter the 6-digit code from your authenticator app</p>
+                        <p class="text-muted d-none" id="recoveryPrompt">Enter one of your recovery codes</p>
                     </div>
                     
                     <form method="POST">
                         {{ form.hidden_tag() if form else '' }}
                         
-                        <div class="mb-3">
-                            <label for="code" class="form-label">Verification Code</label>
-                            <input type="text" class="form-control form-control-lg text-center" 
-                                   id="code" name="code" maxlength="6" 
-                                   pattern="[0-9]*" inputmode="numeric"
-                                   autocomplete="one-time-code" required autofocus>
-                            <div class="form-text text-center">6-digit code from your authenticator app</div>
+                        <div id="totpSection">
+                            <div class="mb-3">
+                                <label for="code" class="form-label">Verification Code</label>
+                                <input type="text" class="form-control form-control-lg text-center" 
+                                       id="code" name="code" maxlength="6" 
+                                       pattern="[0-9]*" inputmode="numeric"
+                                       autocomplete="one-time-code" required autofocus>
+                                <div class="form-text text-center">6-digit code from your authenticator app</div>
+                            </div>
                         </div>
+
+                        <div id="recoverySection" class="d-none">
+                            <div class="mb-3">
+                                <label for="recovery_code" class="form-label">Recovery Code</label>
+                                <input type="text" class="form-control form-control-lg text-center" 
+                                       id="recovery_code" name="recovery_code" maxlength="11"
+                                       autocomplete="off" placeholder="XXXX-XXXX-XXXX">
+                                <div class="form-text text-center">10-character code from your recovery codes</div>
+                            </div>
+                        </div>
+
+                        <input type="hidden" name="use_recovery" id="use_recovery" value="">
                         
                         <div class="d-grid">
-                            <button type="submit" class="btn btn-primary btn-lg">Verify</button>
+                            <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">Verify</button>
                         </div>
                     </form>
-                    
+
                     <div class="text-center mt-3">
+                        <a href="#" id="toggleRecovery" class="text-decoration-none">Use a recovery code instead</a>
+                        <br>
                         <a href="{{ url_for('auth.login') }}">Back to Login</a>
                     </div>
                 </div>
@@ -39,4 +56,41 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var usingRecovery = false;
+    var toggle = document.getElementById('toggleRecovery');
+    var totpSection = document.getElementById('totpSection');
+    var recoverySection = document.getElementById('recoverySection');
+    var totpPrompt = document.getElementById('totpPrompt');
+    var recoveryPrompt = document.getElementById('recoveryPrompt');
+    var useRecoveryField = document.getElementById('use_recovery');
+    var submitBtn = document.getElementById('submitBtn');
+
+    toggle.addEventListener('click', function(e) {
+        e.preventDefault();
+        usingRecovery = !usingRecovery;
+        if (usingRecovery) {
+            totpSection.classList.add('d-none');
+            recoverySection.classList.remove('d-none');
+            totpPrompt.classList.add('d-none');
+            recoveryPrompt.classList.remove('d-none');
+            toggle.textContent = 'Use authenticator app instead';
+            useRecoveryField.value = '1';
+            submitBtn.textContent = 'Verify Recovery Code';
+            document.getElementById('recovery_code').focus();
+        } else {
+            totpSection.classList.remove('d-none');
+            recoverySection.classList.add('d-none');
+            totpPrompt.classList.remove('d-none');
+            recoveryPrompt.classList.add('d-none');
+            toggle.textContent = 'Use a recovery code instead';
+            useRecoveryField.value = '';
+            submitBtn.textContent = 'Verify';
+            document.getElementById('code').focus();
+        }
+    });
+});
+</script>
 {% endblock %}

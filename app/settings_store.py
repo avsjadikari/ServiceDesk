@@ -8,8 +8,12 @@ page and dashboard renders the full brand string consistently.
 Mail server settings are also stored here. The DB values take
 precedence over the env-var defaults, so an admin can change the mail
 server at runtime without restarting the app.
+
+Mail passwords are encrypted at rest using Fernet (symmetric encryption)
+derived from the app's SECRET_KEY.
 """
 
+import hashlib
 from flask import current_app
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -29,6 +33,43 @@ MAIL_KEYS = {
     "mail_password": "MAIL_PASSWORD",
     "mail_default_sender": "MAIL_DEFAULT_SENDER",
 }
+
+
+def _get_fernet():
+    """Return a Fernet instance derived from the app's SECRET_KEY."""
+    from cryptography.fernet import Fernet
+
+    secret = current_app.config["SECRET_KEY"]
+    key = hashlib.sha256(secret.encode()).digest()
+    return Fernet(__import__("base64").urlsafe_b64encode(key))
+
+
+def _is_fernet_encrypted(value):
+    """Check if a value looks like a Fernet token."""
+    if not value or not isinstance(value, str):
+        return False
+    try:
+        from cryptography.fernet import InvalidToken
+        _get_fernet().decrypt(value.encode())
+        return True
+    except Exception:
+        return False
+
+
+def _encrypt_value(value):
+    """Encrypt a plaintext value for storage."""
+    if not value:
+        return value
+    return _get_fernet().encrypt(value.encode()).decode()
+
+
+def _decrypt_value(value):
+    """Decrypt a stored Fernet token. Returns plaintext."""
+    if not value:
+        return value
+    if _is_fernet_encrypted(value):
+        return _get_fernet().decrypt(value.encode()).decode()
+    return value
 
 
 def get_setting(key, default=None):
@@ -127,7 +168,10 @@ def get_mail_config():
         cfg["MAIL_USERNAME"] = db_user
     db_pass = get_setting(MAIL_KEYS["mail_password"])
     if db_pass is not None:
-        cfg["MAIL_PASSWORD"] = db_pass
+        try:
+            cfg["MAIL_PASSWORD"] = _decrypt_value(db_pass)
+        except Exception:
+            cfg["MAIL_PASSWORD"] = db_pass
     db_sender = get_setting(MAIL_KEYS["mail_default_sender"])
     if db_sender is not None:
         cfg["MAIL_DEFAULT_SENDER"] = db_sender
@@ -163,6 +207,11 @@ def set_mail_config(values, user_id=None):
         if value in (None, ""):
             delete_setting(MAIL_KEYS[setting_key])
         else:
+            if setting_key == "mail_password":
+                try:
+                    value = _encrypt_value(str(value))
+                except Exception:
+                    value = str(value)
             set_setting(MAIL_KEYS[setting_key], str(value), user_id=user_id)
 
 

@@ -1,13 +1,18 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
-from app import db
+from app import db, limiter
 from app.models import Ticket, Article, Asset, User
 from app.utils import (
     get_ticket_metrics,
     calculate_sla_compliance,
     get_status_color,
     get_priority_color,
+    log_audit,
 )
+
+VALID_TICKET_TYPES = {"incident", "service_request", "problem", "change"}
+VALID_TICKET_STATUSES = {"new", "open", "in_progress", "resolved", "closed"}
+VALID_TICKET_PRIORITIES = {"low", "medium", "high", "critical"}
 
 api = Blueprint("api", __name__)
 
@@ -49,20 +54,37 @@ def get_tickets():
 
 @api.route("/tickets", methods=["POST"])
 @login_required
+@limiter.limit("30 per hour")
 def create_ticket():
     from app.utils import generate_ticket_number, calculate_sla_deadline
 
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
+
+    title = (data.get("title") or "").strip()
+    if not title:
+        return jsonify({"error": "Title is required"}), 400
+    if len(title) > 200:
+        return jsonify({"error": "Title must be 200 characters or fewer"}), 400
+
+    ticket_type = data.get("type", "incident")
+    if ticket_type not in VALID_TICKET_TYPES:
+        return jsonify({"error": f"Invalid type. Must be one of: {', '.join(sorted(VALID_TICKET_TYPES))}"}), 400
+
+    priority = data.get("priority", "medium")
+    if priority not in VALID_TICKET_PRIORITIES:
+        return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(VALID_TICKET_PRIORITIES))}"}), 400
 
     ticket = Ticket(
         ticket_number=generate_ticket_number(),
-        title=data.get("title"),
-        description=data.get("description"),
-        type=data.get("type", "incident"),
-        priority=data.get("priority", "medium"),
-        category=data.get("category"),
+        title=title,
+        description=(data.get("description") or "").strip(),
+        type=ticket_type,
+        priority=priority,
+        category=(data.get("category") or "").strip() or None,
         created_by=current_user.id,
-        sla_deadline=calculate_sla_deadline(data.get("priority", "medium")),
+        sla_deadline=calculate_sla_deadline(priority),
     )
 
     db.session.add(ticket)
@@ -109,20 +131,34 @@ def get_ticket(ticket_id):
 @api.route("/tickets/<int:ticket_id>", methods=["PUT"])
 @login_required
 @require_agent
+@limiter.limit("30 per hour")
 def update_ticket(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     data = request.get_json()
+    if not data:
+        return jsonify({"error": "Request body must be JSON"}), 400
 
     if "title" in data:
-        ticket.title = data["title"]
+        title = (data["title"] or "").strip()
+        if not title:
+            return jsonify({"error": "Title cannot be empty"}), 400
+        if len(title) > 200:
+            return jsonify({"error": "Title must be 200 characters or fewer"}), 400
+        ticket.title = title
     if "description" in data:
-        ticket.description = data["description"]
+        ticket.description = (data["description"] or "").strip()
     if "status" in data:
-        ticket.status = data["status"]
+        status = data["status"]
+        if status not in VALID_TICKET_STATUSES:
+            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(VALID_TICKET_STATUSES))}"}), 400
+        ticket.status = status
     if "priority" in data:
-        ticket.priority = data["priority"]
+        priority = data["priority"]
+        if priority not in VALID_TICKET_PRIORITIES:
+            return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(VALID_TICKET_PRIORITIES))}"}), 400
+        ticket.priority = priority
     if "category" in data:
-        ticket.category = data["category"]
+        ticket.category = (data["category"] or "").strip() or None
     if "assigned_to" in data:
         ticket.assigned_to = data["assigned_to"]
 
@@ -134,8 +170,17 @@ def update_ticket(ticket_id):
 @api.route("/tickets/<int:ticket_id>", methods=["DELETE"])
 @login_required
 @require_agent
+@limiter.limit("30 per hour")
 def delete_ticket(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
+    ticket_number = ticket.ticket_number
+    log_audit(
+        current_user.id,
+        "delete_ticket",
+        "ticket",
+        ticket.id,
+        details={"ticket_number": ticket_number},
+    )
     db.session.delete(ticket)
     db.session.commit()
 
@@ -143,6 +188,7 @@ def delete_ticket(ticket_id):
 
 
 @api.route("/articles", methods=["GET"])
+@login_required
 def get_articles():
     query = Article.query.filter_by(status="published")
 
@@ -172,6 +218,7 @@ def get_articles():
 
 
 @api.route("/articles/<int:article_id>", methods=["GET"])
+@login_required
 def get_article(article_id):
     article = Article.query.get_or_404(article_id)
 
