@@ -220,3 +220,37 @@ def calculate_sla_compliance():
         "breached": breached,
         "total": total,
     }
+
+
+_MAGIC_SIGNATURES = {
+    "png": [b"\x89PNG\r\n\x1a\n"],
+    "jpg": [b"\xff\xd8\xff"],
+    "jpeg": [b"\xff\xd8\xff"],
+    "gif": [b"GIF87a", b"GIF89a"],
+    "pdf": [b"%PDF"],
+    "zip": [b"PK\x03\x04", b"PK\x05\x06"],
+    "gz": [b"\x1f\x8b"],
+    "doc": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+    "xls": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+    "ppt": [b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1"],
+    "docx": [b"PK\x03\x04", b"PK\x05\x06"],
+    "xlsx": [b"PK\x03\x04", b"PK\x05\x06"],
+    "pptx": [b"PK\x03\x04", b"PK\x05\x06"],
+    "odt": [b"PK\x03\x04", b"PK\x05\x06"],
+    "ods": [b"PK\x03\x04", b"PK\x05\x06"],
+    "odp": [b"PK\x03\x04", b"PK\x05\x06"],
+}
+
+
+def validate_upload_sniff(filename, head):
+    """Verify that the file's magic bytes match its extension where a
+    reliable signature exists for that extension. Returns True for
+    formats without a signature (txt/csv/log/md/tar/svg...) so those fall
+    back to the existing extension/MIME checks."""
+    ext = filename.rsplit(".", 1)[-1].lower()
+    if ext == "webp":
+        return head[:4] == b"RIFF" and head[8:12] == b"WEBP"
+    signatures = _MAGIC_SIGNATURES.get(ext)
+    if not signatures:
+        return True
+    return any(head.startswith(sig) for sig in signatures)

@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 from app import db
 from app.models import Article, ArticleVersion
 from app.forms import ArticleForm, ArticleSearchForm
@@ -27,7 +28,12 @@ def index():
     if category:
         query = query.filter_by(category=category)
 
-    articles = query.order_by(Article.updated_at.desc()).all()
+    page = request.args.get("page", 1, type=int)
+    articles = (
+        query.order_by(Article.updated_at.desc())
+        .options(joinedload(Article.author))
+        .paginate(page=page, per_page=20, error_out=False)
+    )
 
     return render_template("knowledge/index.html", articles=articles, form=form)
 
@@ -35,7 +41,8 @@ def index():
 @knowledge.route("/knowledge/<int:article_id>")
 def view(article_id):
     article = (
-        Article.query.filter(
+        Article.query.options(joinedload(Article.author))
+        .filter(
             Article.id == article_id, Article.status == "published"
         ).first_or_404()
     )
@@ -43,7 +50,8 @@ def view(article_id):
     db.session.commit()
 
     related = (
-        Article.query.filter(
+        Article.query.options(joinedload(Article.author))
+        .filter(
             Article.id != article.id,
             Article.status == "published",
             Article.category == article.category,

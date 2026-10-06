@@ -55,6 +55,15 @@ class Config:
 
     WTF_CSRF_TIME_LIMIT = 60 * 60 * 4
 
+    # Rate limiting storage. Undefined/empty keeps Flask-Limiter's in-memory
+    # backend; production should point at Redis, e.g.:
+    #   REDIS_URL=redis://redis:6379/0
+    RATELIMIT_STORAGE_URI = os.environ.get("REDIS_URL") or "memory://"
+
+    # Deliver email without blocking the request. False keeps sends
+    # synchronous (used by tests and flows that need a result).
+    MAIL_ASYNC = os.environ.get("MAIL_ASYNC", "false").lower() in ("true", "on", "1")
+
     # Account lockout
     LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
     LOGIN_LOCKOUT_MINUTES = int(os.environ.get("LOGIN_LOCKOUT_MINUTES", "15"))

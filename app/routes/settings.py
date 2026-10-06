@@ -198,7 +198,7 @@ def test_mail():
     )
     recipient = form.recipient.data.strip()
     try:
-        sent = send_email(recipient, subject, body)
+        sent = send_email(recipient, subject, body, async_=False)
     except MailSendError as exc:
         log_audit(
             current_user.id,

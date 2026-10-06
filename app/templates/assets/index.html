@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% from "_pagination.html" import render_pagination with context %}
 
 {% block title %}Assets - {{ company_name }}{% endblock %}
 
@@ -49,12 +50,14 @@
             </tbody>
         </table>
         
-        {% if not assets %}
+        {% if not assets.items %}
         <div class="text-center py-5 text-muted">
             <i class="bi bi-pc" style="font-size: 3rem;"></i>
             <p class="mt-2">No assets found</p>
         </div>
         {% endif %}
+
+        {{ render_pagination(assets, 'assets.index') }}
     </div>
 </div>
 {% endblock %}

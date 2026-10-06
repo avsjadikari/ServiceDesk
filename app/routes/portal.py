@@ -41,7 +41,11 @@ def knowledge():
     if category:
         query = query.filter_by(category=category)
 
-    articles = query.order_by(Article.updated_at.desc()).all()
+    page = request.args.get("page", 1, type=int)
+    articles = (
+        query.order_by(Article.updated_at.desc())
+        .paginate(page=page, per_page=20, error_out=False)
+    )
 
     return render_template("portal/knowledge.html", articles=articles)
 
@@ -62,10 +66,11 @@ def knowledge_view(article_id):
 @portal.route("/portal/tickets")
 @login_required
 def my_tickets():
+    page = request.args.get("page", 1, type=int)
     tickets = (
         Ticket.query.filter_by(created_by=current_user.id)
         .order_by(Ticket.created_at.desc())
-        .all()
+        .paginate(page=page, per_page=25, error_out=False)
     )
     return render_template("portal/my_tickets.html", tickets=tickets)
 

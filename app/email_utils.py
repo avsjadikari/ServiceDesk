@@ -1,5 +1,6 @@
 import logging
 import smtplib
+import threading
 
 from flask_mail import Mail, Message
 from flask import current_app
@@ -7,6 +8,8 @@ from flask import current_app
 mail = Mail()
 
 logger = logging.getLogger(__name__)
+
+_background_workers = set()
 
 
 class MailSendError(Exception):
@@ -76,12 +79,16 @@ def _smtp_error_hint(code, server):
     return f"Check the SMTP server ({server}) configuration and credentials."
 
 
-def send_email(to, subject, body, html=None, sender=None):
+def send_email(to, subject, body, html=None, sender=None, async_=None):
     """Send an email. Returns True on success.
 
-    Raises ``MailSendError`` on user-actionable failures (no From
-    address, SMTP auth failure, etc.) and logs+returns False on any
-    other unexpected error.
+    ``async_`` forces asynchronous dispatch when True or synchronous
+    when False; ``None`` (default) falls back to the ``MAIL_ASYNC``
+    config value. In async mode this returns True as soon as the send
+    is queued on a daemon thread; failures are logged, never raised.
+    ``MailSendError`` is only raised in sync mode, for user-actionable
+    failures (no From address, SMTP auth failure, etc.); any other
+    unexpected error is logged and returns False.
     """
     if not current_app.config.get("MAIL_USERNAME"):
         logger.warning(
@@ -99,11 +106,28 @@ def send_email(to, subject, body, html=None, sender=None):
         logger.warning("Email not sent: %s", msg)
         raise MailSendError(msg)
 
+    if async_ is None:
+        async_ = current_app.config.get("MAIL_ASYNC", False)
+
+    recipients = [to] if isinstance(to, str) else list(to)
+
+    if async_:
+        app = current_app._get_current_object()
+        thread = threading.Thread(
+            target=_run_in_background,
+            args=(_send_in_background, app, from_addr, recipients, subject, body, html),
+            daemon=True,
+        )
+        _background_workers.add(thread)
+        thread.start()
+        logger.info("Email queued asynchronously to %s subject=%r", to, subject)
+        return True
+
     try:
         msg = Message(
             subject=subject,
             sender=from_addr,
-            recipients=[to] if isinstance(to, str) else list(to),
+            recipients=recipients,
             body=body,
             html=html,
         )
@@ -139,6 +163,44 @@ def send_email(to, subject, body, html=None, sender=None):
     except Exception:
         logger.exception("Failed to send email to %s subject=%r", to, subject)
         return False
+
+
+def _run_in_background(target, *args):
+    try:
+        target(*args)
+    finally:
+        _background_workers.discard(threading.current_thread())
+
+
+def _send_in_background(app, from_addr, recipients, subject, body, html):
+    try:
+        with app.app_context():
+            msg = Message(
+                subject=subject,
+                sender=from_addr,
+                recipients=recipients,
+                body=body,
+                html=html,
+            )
+            mail.send(msg)
+        logger.info(
+            "Email sent (async) to %s subject=%r", recipients, subject
+        )
+    except Exception:
+        logger.exception(
+            "Async email failed to=%s subject=%r", recipients, subject
+        )
+
+
+def join_email_workers(timeout=30):
+    """Wait for in-flight background sends and clear the registry.
+
+    Intended for tests and shutdown paths that must not race an
+    asynchronous email dispatch.
+    """
+    for thread in list(_background_workers):
+        thread.join(timeout)
+    _background_workers.clear()
 
 
 def send_ticket_created(ticket):
@@ -210,7 +272,7 @@ def send_password_reset(user, reset_url):
         f"your password will remain unchanged.\n\n"
         f"Thank you,\nServiceDesk Team"
     )
-    return send_email(user.email, subject, body)
+    return send_email(user.email, subject, body, async_=False)
 
 
 def send_welcome_email(user):

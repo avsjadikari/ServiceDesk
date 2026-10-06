@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 from app import db
 from app.models import Asset, User
 from app.forms import AssetForm
@@ -23,7 +24,12 @@ def index():
     if asset_type:
         query = query.filter_by(asset_type=asset_type)
 
-    assets_list = query.order_by(Asset.name.asc()).all()
+    page = request.args.get("page", 1, type=int)
+    assets_list = (
+        query.order_by(Asset.name.asc())
+        .options(joinedload(Asset.owner))
+        .paginate(page=page, per_page=25, error_out=False)
+    )
 
     return render_template("assets/index.html", assets=assets_list)
 

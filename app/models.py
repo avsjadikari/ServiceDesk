@@ -1,18 +1,24 @@
 from datetime import datetime, timedelta
 from flask_login import UserMixin
+from sqlalchemy import CheckConstraint
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
 
 
 class User(UserMixin, db.Model):
     __tablename__ = "users"
+    __table_args__ = (
+        CheckConstraint(
+            "role IN ('user', 'agent', 'admin')", name="ck_users_role"
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, nullable=False, index=True)
     email = db.Column(db.String(120), unique=True, nullable=False, index=True)
     password_hash = db.Column(db.String(256))
     full_name = db.Column(db.String(128))
-    role = db.Column(db.String(20), default="user")
+    role = db.Column(db.String(20), default="user", index=True)
     department = db.Column(db.String(64))
     phone = db.Column(db.String(20))
     is_active = db.Column(db.Boolean, default=True)
@@ -102,6 +108,21 @@ class User(UserMixin, db.Model):
 
 class Ticket(db.Model):
     __tablename__ = "tickets"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('new', 'assigned', 'in_progress', 'pending', "
+            "'resolved', 'closed')",
+            name="ck_tickets_status",
+        ),
+        CheckConstraint(
+            "priority IN ('low', 'medium', 'high', 'critical')",
+            name="ck_tickets_priority",
+        ),
+        CheckConstraint(
+            "type IN ('incident', 'request', 'problem')",
+            name="ck_tickets_type",
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     ticket_number = db.Column(db.String(20), unique=True, nullable=False, index=True)
@@ -112,8 +133,8 @@ class Ticket(db.Model):
     priority = db.Column(db.String(20), default="medium", index=True)
     category = db.Column(db.String(64), index=True)
 
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
-    assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
+    assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
 
     asset_id = db.Column(db.Integer, db.ForeignKey("assets.id"))
 
@@ -162,8 +183,8 @@ class Comment(db.Model):
     __tablename__ = "comments"
 
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     content = db.Column(db.Text, nullable=False)
     is_internal = db.Column(db.Boolean, default=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -174,20 +195,26 @@ class Comment(db.Model):
 
 class Article(db.Model):
     __tablename__ = "articles"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'published', 'archived')",
+            name="ck_articles_status",
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(200), nullable=False)
     content = db.Column(db.Text, nullable=False)
     category = db.Column(db.String(64), index=True)
     tags = db.Column(db.JSON)
-    author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     status = db.Column(db.String(20), default="draft", index=True)
     version = db.Column(db.Integer, default=1)
     view_count = db.Column(db.Integer, default=0)
     helpful_count = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(
-        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+        db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, index=True
     )
 
     versions = db.relationship(
@@ -205,7 +232,9 @@ class ArticleVersion(db.Model):
     __tablename__ = "article_versions"
 
     id = db.Column(db.Integer, primary_key=True)
-    article_id = db.Column(db.Integer, db.ForeignKey("articles.id"), nullable=False)
+    article_id = db.Column(
+        db.Integer, db.ForeignKey("articles.id"), nullable=False, index=True
+    )
     version = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
@@ -217,14 +246,20 @@ class ArticleVersion(db.Model):
 
 class Asset(db.Model):
     __tablename__ = "assets"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('active', 'maintenance', 'retired', 'available')",
+            name="ck_assets_status",
+        ),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(200), nullable=False)
+    name = db.Column(db.String(200), nullable=False, index=True)
     asset_type = db.Column(db.String(50))
     serial_number = db.Column(db.String(100), unique=True)
     model = db.Column(db.String(100))
     manufacturer = db.Column(db.String(100))
-    assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"))
+    assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
     location = db.Column(db.String(200))
     status = db.Column(db.String(20), default="active", index=True)
     purchase_date = db.Column(db.Date)
@@ -245,7 +280,9 @@ class Attachment(db.Model):
     __tablename__ = "attachments"
 
     id = db.Column(db.Integer, primary_key=True)
-    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"), nullable=False)
+    ticket_id = db.Column(
+        db.Integer, db.ForeignKey("tickets.id"), nullable=False, index=True
+    )
     filename = db.Column(db.String(256), nullable=False)
     filepath = db.Column(db.String(512), nullable=False)
     file_size = db.Column(db.Integer)

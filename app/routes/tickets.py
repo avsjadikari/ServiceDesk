@@ -14,6 +14,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -26,6 +27,7 @@ from app.utils import (
     get_priority_color,
     get_status_color,
     log_audit,
+    validate_upload_sniff,
 )
 
 tickets = Blueprint("tickets", __name__)
@@ -61,7 +63,12 @@ def index():
     if assigned_to:
         query = query.filter_by(assigned_to=int(assigned_to))
 
-    tickets = query.order_by(Ticket.created_at.desc()).all()
+    page = request.args.get("page", 1, type=int)
+    tickets = (
+        query.order_by(Ticket.created_at.desc())
+        .options(joinedload(Ticket.creator), joinedload(Ticket.assignee))
+        .paginate(page=page, per_page=25, error_out=False)
+    )
 
     return render_template("tickets/index.html", tickets=tickets, form=form)
 
@@ -122,6 +129,7 @@ def view(ticket_id):
     comment_form = CommentForm()
     comments = (
         Comment.query.filter_by(ticket_id=ticket.id)
+        .options(joinedload(Comment.user))
         .order_by(Comment.created_at.asc())
         .all()
     )
@@ -385,6 +393,21 @@ def upload_attachment(ticket_id):
         current_app.logger.warning(
             "Rejected attachment upload user_id=%s ticket_id=%s "
             "filename=%s mime=%s",
+            current_user.id,
+            ticket.id,
+            f.filename,
+            f.mimetype,
+        )
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    f.stream.seek(0)
+    head = f.stream.read(512)
+    f.stream.seek(0)
+    if not validate_upload_sniff(f.filename, head):
+        flash("File content does not match its extension.", "danger")
+        current_app.logger.warning(
+            "Rejected attachment upload (magic-bytes mismatch) "
+            "user_id=%s ticket_id=%s filename=%s mime=%s",
             current_user.id,
             ticket.id,
             f.filename,
