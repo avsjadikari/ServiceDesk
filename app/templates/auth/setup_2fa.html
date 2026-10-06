@@ -27,6 +27,7 @@
                     <hr>
                     
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label for="code" class="form-label">Enter Verification Code</label>
                             <input type="text" class="form-control form-control-lg text-center" 

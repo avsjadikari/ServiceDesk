@@ -318,3 +318,101 @@ class TestTicketAssignment:
             ticket = Ticket.query.get(ticket.id)
             assert ticket.assigned_to is None
             assert ticket.status == "new"
+
+    def test_ticket_view_assign_dropdown_lists_agents(
+        self, client, app, db, admin_user, agent_user
+    ):
+        """Assign dropdown must list agent/admin options.
+
+        Regression: the template iterates ``users`` but the view route
+        never passed it, so only "Unassigned" rendered and assignment
+        never persisted.
+        """
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            ticket = Ticket(
+                ticket_number="TKT-000006",
+                title="Test",
+                description="Test",
+                created_by=admin_user.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.get(f"/tickets/{ticket.id}")
+            assert response.status_code == 200
+            assert f'value="{agent_user.id}"'.encode() in response.data
+            assert f'value="{admin_user.id}"'.encode() in response.data
+
+
+class TestKanbanBoard:
+    """Test Kanban board functionality and JSON status update"""
+
+    def test_kanban_board_agent_access(self, client, app, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            response = client.get("/tickets/board")
+            assert response.status_code == 200
+            assert b"Ticket Workflow Board" in response.data
+
+    def test_kanban_board_user_forbidden(self, client, app, regular_user):
+        with app.app_context():
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+            response = client.get("/tickets/board")
+            assert response.status_code == 403
+
+    def test_kanban_json_status_update(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-000099",
+                title="Kanban Test",
+                description="Test Drag and Drop",
+                created_by=admin_user.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+                status="new",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/update-status",
+                json={"status": "in_progress"},
+            )
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["status"] == "in_progress"
+
+            updated_ticket = Ticket.query.get(ticket.id)
+            assert updated_ticket.status == "in_progress"
+            assert updated_ticket.first_response_at is not None
+
+    def test_ticket_list_with_sla_deadlines(self, client, app, db, admin_user):
+        """Test tickets index renders properly with tickets having SLA deadlines"""
+        from datetime import datetime, timedelta
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-000777",
+                title="SLA Test",
+                description="Test SLA deadline rendering",
+                created_by=admin_user.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+                status="in_progress",
+                sla_deadline=datetime.utcnow() + timedelta(hours=2),
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.get("/tickets?status=in_progress")
+            assert response.status_code == 200
+            assert b"TKT-000777" in response.data

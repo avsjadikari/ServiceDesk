@@ -20,6 +20,10 @@ This document provides a comprehensive security assessment of the ServiceDesk ap
 8. **Security Headers (production)**: Flask-Talisman with CSP, HSTS (1y, preload, includeSubDomains), `frame-ancestors 'none'`, `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`, HTTPS redirect
 9. **HTTPS-only cookies in production**: `SESSION_COOKIE_SECURE`, `REMEMBER_COOKIE_SECURE`
 10. **Schema migrations**: Flask-Migrate / Alembic (replaces ad-hoc `db.create_all()` for production)
+11. **Open Redirect Prevention**: `/set-lang/<lang_code>` checks `request.referrer` starts with `request.host_url`; safely defaults to dashboard
+12. **Locale Whitelisting**: Language codes validated against `SUPPORTED_LANGUAGES` allow-list (`en`, `es`, `fr`, `de`, `ja`, `ar`, `si`) in `app/i18n.py`, blocking path-traversal or catalog injection
+13. **AJAX CSRF Protection**: Drag-and-drop status update endpoint (`/tickets/<id>/update-status`) validates `X-CSRFToken` header
+
 
 ### ⚠️ Security Issues Found
 
@@ -182,9 +186,9 @@ def sanitize_markdown(text):
 
 ---
 
-## Week 2 Hardening – Completed
+## Hardening & Recent Security Implementation
 
-All Week 2 items are implemented and the test suite is green (32 passed):
+All security items are implemented and verified with 96 passing tests:
 
 - **1.4 – Password reset flow**: `app/security.py` uses `itsdangerous.URLSafeTimedSerializer` with `PASSWORD_RESET_MAX_AGE`. `/forgot-password` (3/min) and `/reset-password/<token>` (5/min) routes in `app/routes/auth.py` use a single generic success flash to prevent user enumeration. `send_password_reset` in `app/email_utils.py` accepts the reset URL.
 - **1.5 – Account lockout**: `User.is_locked()`, `record_failed_login(max_attempts, lockout_minutes)`, `reset_failed_logins()`. Login route locks the account, sends a `send_account_locked` email, and writes an audit-log entry. Configurable via `LOGIN_MAX_ATTEMPTS` (default 5) and `LOGIN_LOCKOUT_MINUTES` (default 15).
@@ -193,6 +197,9 @@ All Week 2 items are implemented and the test suite is green (32 passed):
 - **1.9 – Markdown sanitisation**: `app/sanitize.py` whitelists tags, attributes and protocols (`markdown` + `bleach`). Wired into `app/templates/tickets/view.html`, `app/templates/portal/view_ticket.html`, `app/templates/knowledge/view.html`, `app/templates/portal/knowledge_view.html`.
 - **3.4 – Error handling hygiene**: every `try/except: pass` block in `email_utils.py`, `routes/tickets.py`, and `__init__.py` has been replaced with `current_app.logger.warning`/`exception` calls. Email helpers return `bool`; routes log structured failures.
 - **6.12 – Attachment uploads**: `POST /tickets/<id>/attachments` and `GET /attachments/<id>` in `app/routes/tickets.py`. Filename is run through `werkzeug.utils.secure_filename`, prefixed with a UUIDv4, and re-validated to stay inside `UPLOAD_FOLDER` (path-traversal block). Extension and MIME prefix allow-lists come from `UPLOAD_ALLOWED_EXTENSIONS` and `UPLOAD_ALLOWED_MIME_PREFIXES`. File-size cap = `MAX_CONTENT_LENGTH` (16 MB). Access control: ticket reporter, assignee, or any agent/admin. `tickets/view.html` lists current attachments and renders the upload form.
+- **7.1 – Open redirect protection in i18n**: `/set-lang/<lang_code>` route ensures redirect destination is local to `request.host_url` when using `request.referrer`. Prevents malicious offsite redirections.
+- **7.2 – CSRF on AJAX status updates**: `POST /tickets/<id>/update-status` endpoint used by the Kanban board enforces `X-CSRFToken` verification.
 - **Sentry**: `SENTRY_DSN` env var turns on `sentry-sdk[flask]` init; never initialised in the `testing` config.
 
 Note: attachment routes depend on `UPLOAD_FOLDER` being writable; the Docker entrypoint chowns `instance/uploads` to the `servicedesk` user. Locally, the directory is created lazily with `os.makedirs(..., exist_ok=True)`.
+

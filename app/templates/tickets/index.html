@@ -4,11 +4,27 @@
 {% block title %}Tickets - {{ company_name }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="bi bi-ticket-detailed me-2"></i>Tickets</h1>
-    <a href="{{ url_for('tickets.new') }}" class="btn btn-primary">
-        <i class="bi bi-plus me-1"></i>New Ticket
-    </a>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-ticket-detailed me-2 text-primary"></i>{{ _('Tickets') }}</h1>
+        <p class="text-muted mb-0">Search, filter, and manage all support incidents and service requests.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('tickets.index') }}" class="btn btn-primary btn-sm active">
+                <i class="bi bi-list-ul me-1"></i>{{ _('List View') }}
+            </a>
+            <a href="{{ url_for('tickets.board') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-kanban me-1"></i>{{ _('Board View') }}
+            </a>
+        </div>
+        <button class="btn btn-outline-primary btn-sm" onclick="ServiceDesk.exportTableToCSV('ticketsTable', 'tickets_export.csv')">
+            <i class="bi bi-download me-1"></i>{{ _('Export') }}
+        </button>
+        <a href="{{ url_for('tickets.new') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>{{ _('New Ticket') }}
+        </a>
+    </div>
 </div>
 
 <div class="card mb-4">
@@ -27,10 +43,10 @@
                 {{ form.assigned_to(class="form-select") }}
             </div>
             <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">Filter</button>
+                <button type="submit" class="btn btn-primary w-100">{{ _('Filter') }}</button>
             </div>
             <div class="col-md-2">
-                <a href="{{ url_for('tickets.index') }}" class="btn btn-secondary w-100">Clear</a>
+                <a href="{{ url_for('tickets.index') }}" class="btn btn-secondary w-100">{{ _('Clear') }}</a>
             </div>
         </form>
     </div>
@@ -38,18 +54,18 @@
 
 <div class="card">
     <div class="card-body p-0">
-        <table class="table table-hover mb-0">
+        <table class="table table-hover mb-0" id="ticketsTable">
             <thead>
                 <tr>
-                    <th>Ticket #</th>
-                    <th>Title</th>
-                    <th>Type</th>
-                    <th>Category</th>
-                    <th>Priority</th>
-                    <th>Status</th>
-                    <th>Assigned To</th>
-                    <th>Created</th>
-                    <th>SLA</th>
+                    <th>{{ _('Ticket') }} #</th>
+                    <th>{{ _('Title') }}</th>
+                    <th>{{ _('Type') }}</th>
+                    <th>{{ _('Category') }}</th>
+                    <th>{{ _('Priority') }}</th>
+                    <th>{{ _('Status') }}</th>
+                    <th>{{ _('Assigned To') }}</th>
+                    <th>{{ _('Created') }}</th>
+                    <th>{{ _('SLA') }}</th>
                 </tr>
             </thead>
             <tbody>
@@ -58,30 +74,30 @@
                     <td>
                         <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a>
                     </td>
-                    <td>{{ ticket.title[:50] }}{% if ticket.title|length > 50 %}...{% endif %}</td>
-                    <td>{{ ticket.type }}</td>
-                    <td>{{ ticket.category or '-' }}</td>
+                    <td>{{ ticket.title[:50] }}{% if ticket.title|length > 50 %}…{% endif %}</td>
+                    <td>{{ _(ticket.type) }}</td>
+                    <td>{{ _(ticket.category) if ticket.category else '-' }}</td>
                     <td>
                         <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
-                            {{ ticket.priority }}
+                            {{ _(ticket.priority) }}
                         </span>
                     </td>
                     <td>
                         <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
-                            {{ ticket.status }}
+                            {{ _(ticket.status) }}
                         </span>
                     </td>
                     <td>{{ ticket.assignee.full_name if ticket.assignee else '-' }}</td>
                     <td>{{ ticket.created_at.strftime('%m/%d %H:%M') }}</td>
                     <td>
                         {% if ticket.is_sla_breached %}
-                        <span class="badge bg-danger">Breached</span>
+                        <span class="badge bg-danger"><i class="bi bi-clock-history me-1"></i>{{ _('Breached') }}</span>
                         {% elif ticket.sla_deadline %}
-                        <small class="text-{{ 'danger' if (ticket.sla_deadline - now()).total_seconds() < 3600 else 'muted' }}">
+                        <span class="badge badge-soft badge-soft-warning">
                             {{ ticket.sla_deadline.strftime('%m/%d %H:%M') }}
-                        </small>
+                        </span>
                         {% else %}
-                        -
+                        <span class="text-muted small">-</span>
                         {% endif %}
                     </td>
                 </tr>

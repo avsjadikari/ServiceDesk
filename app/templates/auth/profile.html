@@ -12,6 +12,7 @@
                 </div>
                 <div class="card-body">
                     <form method="POST">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         <div class="mb-3">
                             <label class="form-label">Username</label>
                             <input type="text" class="form-control" value="{{ current_user.username }}" disabled>
@@ -99,6 +100,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
             </div>
             <form method="POST" action="{{ url_for('auth.disable_2fa') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                 <div class="modal-body">
                     <p>Are you sure you want to disable two-factor authentication?</p>
                     <p class="text-muted small">This will make your account less secure. Enter your password to confirm.</p>

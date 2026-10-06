@@ -1,0 +1,351 @@
+{% extends "base.html" %}
+
+{% block title %}{{ _('Kanban Board') }} - {{ company_name }}{% endblock %}
+
+{% block content %}
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-kanban me-2 text-primary"></i>{{ _('Ticket Workflow Board') }}</h1>
+        <p class="text-muted mb-0">Drag and drop tickets across stages to update status and advance resolution.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group" role="group">
+            <a href="{{ url_for('tickets.index') }}" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-list-ul me-1"></i>{{ _('List View') }}
+            </a>
+            <a href="{{ url_for('tickets.board') }}" class="btn btn-primary btn-sm active">
+                <i class="bi bi-kanban me-1"></i>{{ _('Board View') }}
+            </a>
+        </div>
+        <a href="{{ url_for('tickets.new') }}" class="btn btn-primary btn-sm">
+            <i class="bi bi-plus-lg me-1"></i>{{ _('New Ticket') }}
+        </a>
+    </div>
+</div>
+
+<!-- Kanban Columns Container -->
+<div class="kanban-board">
+    {% set stage_defs = [
+        ('new', 'New & Triage', 'primary', 'bi-inbox'),
+        ('assigned', 'Assigned', 'info', 'bi-person-check'),
+        ('in_progress', 'In Progress', 'warning', 'bi-play-circle'),
+        ('pending', 'Pending / Waiting', 'secondary', 'bi-pause-circle'),
+        ('resolved', 'Resolved', 'success', 'bi-check2-circle')
+    ] %}
+
+    {% for status_key, label, color, icon in stage_defs %}
+    {% set stage_tickets = columns.get(status_key, []) %}
+    <div class="kanban-column" data-status="{{ status_key }}">
+        <div class="kanban-column-header">
+            <h6 class="kanban-column-title">
+                <i class="bi {{ icon }} text-{{ color }}"></i>
+                <span>{{ _(label) }}</span>
+            </h6>
+            <span class="badge badge-soft badge-soft-{{ color }} rounded-pill column-counter" id="count-{{ status_key }}">
+                {{ stage_tickets|length }}
+            </span>
+        </div>
+
+        <div class="kanban-cards" data-status="{{ status_key }}">
+            {% for ticket in stage_tickets %}
+            <div class="kanban-card" draggable="true" data-ticket-id="{{ ticket.id }}" data-assigned-to="{{ ticket.assigned_to or '' }}">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="fw-bold small text-decoration-none">
+                        {{ ticket.ticket_number }}
+                    </a>
+                    <span class="badge badge-soft badge-soft-{{ 'danger' if ticket.priority in ['critical', 'high'] else 'warning' if ticket.priority == 'medium' else 'success' }} small">
+                        {{ _(ticket.priority) }}
+                    </span>
+                </div>
+
+                <div class="text-truncate fw-medium small mb-2" title="{{ ticket.title }}">
+                    {{ ticket.title }}
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center pt-2 border-top mt-2">
+                    <div class="d-flex align-items-center gap-1 text-muted small">
+                        {% if ticket.assignee %}
+                        <div class="bg-secondary text-white rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 20px; height: 20px; font-size: 0.65rem;" title="{{ ticket.assignee.full_name }}">
+                            {{ ticket.assignee.full_name[:2]|upper }}
+                        </div>
+                        <span class="text-truncate" style="max-width: 90px;">{{ ticket.assignee.full_name.split(' ')[0] }}</span>
+                        {% else %}
+                        <i class="bi bi-person text-muted"></i>
+                        <span>{{ _('Unassigned') }}</span>
+                        {% endif %}
+                    </div>
+
+                    <div>
+                        {% if ticket.is_sla_breached %}
+                        <span class="badge bg-danger p-1" title="SLA Breached"><i class="bi bi-clock-history"></i> {{ _('Breached') }}</span>
+                        {% elif ticket.sla_deadline %}
+                        <span class="badge badge-soft badge-soft-warning small" title="Deadline: {{ ticket.sla_deadline.strftime('%m/%d %H:%M') }}">
+                            <i class="bi bi-clock"></i> {{ ticket.sla_deadline.strftime('%m/%d') }}
+                        </span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Status change: requires a comment; assignee picker shown when moving to "Assigned" -->
+<div class="modal fade" id="statusModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="bi bi-arrow-left-right me-2"></i>Update ticket status</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="mb-3 small text-muted" id="statusChangeInfo"></p>
+                <div class="mb-3" id="boardAssignWrap">
+                    <label for="boardAssignSelect" class="form-label">Who should handle this ticket?</label>
+                    <select id="boardAssignSelect" class="form-select">
+                        <option value="">Unassigned</option>
+                        {% for agent in agents %}
+                        <option value="{{ agent.id }}">{{ agent.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label for="boardComment" class="form-label">
+                        Comment <span class="text-danger">*</span>
+                    </label>
+                    <textarea id="boardComment" class="form-control" rows="3" required
+                              placeholder="Explain why this ticket is moving to this status..."></textarea>
+                    <div class="form-text">A comment is required on every status change.</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="boardStatusCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="boardStatusConfirm">Save &amp; move</button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script nonce="{{ csp_nonce() }}">
+    (function () {
+        let draggedCard = null;
+        let sourceColumn = null;
+        let pendingDrop = null;
+
+        const STATUS_LABELS = {
+            new: 'New & Triage',
+            assigned: 'Assigned',
+            in_progress: 'In Progress',
+            pending: 'Pending / Waiting',
+            resolved: 'Resolved'
+        };
+
+        function updateColumnCounters() {
+            document.querySelectorAll('.kanban-column').forEach(col => {
+                const status = col.getAttribute('data-status');
+                const count = col.querySelectorAll('.kanban-card').length;
+                const counter = document.getElementById(`count-${status}`);
+                if (counter) counter.innerText = count;
+            });
+        }
+
+        function markAssigned(card, assigneeId, assigneeName) {
+            card.setAttribute('data-assigned-to', assigneeId);
+            const footer = card.querySelector('.d-flex.align-items-center.gap-1');
+            if (footer) {
+                footer.textContent = '';
+                const avatar = document.createElement('div');
+                avatar.className = 'bg-secondary text-white rounded-circle d-inline-flex align-items-center justify-content-center';
+                avatar.style.width = '20px';
+                avatar.style.height = '20px';
+                avatar.style.fontSize = '0.65rem';
+                avatar.title = assigneeName;
+                avatar.textContent = (assigneeName || '?').slice(0, 2).toUpperCase();
+                const name = document.createElement('span');
+                name.className = 'text-truncate';
+                name.style.maxWidth = '90px';
+                name.textContent = (assigneeName || '').split(' ')[0];
+                footer.appendChild(avatar);
+                footer.appendChild(name);
+            }
+        }
+
+        function restoreCard(card, column) {
+            if (column && card) {
+                column.appendChild(card);
+                updateColumnCounters();
+            }
+        }
+
+        function clearPending() {
+            pendingDrop = null;
+            draggedCard = null;
+            sourceColumn = null;
+        }
+
+        function postStatus(ticketId, status) {
+            const csrfToken = ServiceDesk.getCSRFToken();
+            return fetch(`/tickets/${ticketId}/update-status`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify({ status })
+            }).then(res => res.json()).then(result => {
+                if (!result.success) throw new Error(result.error || 'Server rejected status update');
+            });
+        }
+
+        function postAssign(ticketId, assigneeId) {
+            const csrfToken = ServiceDesk.getCSRFToken();
+            const body = new FormData();
+            body.append('assigned_to', assigneeId);
+            body.append('csrf_token', csrfToken);
+            return fetch(`/tickets/${ticketId}/assign`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body
+            }).then(res => {
+                if (!res.ok) throw new Error('Server rejected assignment');
+            });
+        }
+
+        function postComment(ticketId, content) {
+            const csrfToken = ServiceDesk.getCSRFToken();
+            const body = new FormData();
+            body.append('content', content);
+            body.append('csrf_token', csrfToken);
+            return fetch(`/tickets/${ticketId}/comment`, {
+                method: 'POST',
+                headers: { 'X-CSRFToken': csrfToken },
+                body
+            }).then(res => {
+                if (!res.ok) throw new Error('Server rejected comment');
+            });
+        }
+
+        function openStatusModal(p) {
+            const fromLabel = STATUS_LABELS[p.sourceStatus] || p.sourceStatus;
+            const toLabel = STATUS_LABELS[p.targetStatus] || p.targetStatus;
+            document.getElementById('statusChangeInfo').innerHTML =
+                'Moving ticket <strong>#' + p.ticketId + '</strong> from ' +
+                '<span class="badge bg-secondary">' + fromLabel + '</span> to ' +
+                '<span class="badge bg-primary">' + toLabel + '</span>';
+            document.getElementById('boardAssignWrap').style.display =
+                (p.targetStatus === 'assigned' && !p.hasAssignee) ? '' : 'none';
+            document.getElementById('boardAssignSelect').value = '';
+            const comment = document.getElementById('boardComment');
+            comment.value = '';
+            comment.classList.remove('is-invalid');
+            bootstrap.Modal.getOrCreateInstance(document.getElementById('statusModal')).show();
+            setTimeout(() => comment.focus(), 50);
+        }
+
+        document.querySelectorAll('.kanban-card').forEach(card => {
+            card.addEventListener('dragstart', function (e) {
+                draggedCard = this;
+                sourceColumn = this.closest('.kanban-cards');
+                this.classList.add('dragging');
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', this.getAttribute('data-ticket-id'));
+            });
+
+            card.addEventListener('dragend', function () {
+                this.classList.remove('dragging');
+                document.querySelectorAll('.kanban-cards').forEach(c => c.classList.remove('drag-over'));
+            });
+        });
+
+        document.querySelectorAll('.kanban-cards').forEach(dropZone => {
+            dropZone.addEventListener('dragover', function (e) {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                this.classList.add('drag-over');
+            });
+
+            dropZone.addEventListener('dragleave', function () {
+                this.classList.remove('drag-over');
+            });
+
+            dropZone.addEventListener('drop', function (e) {
+                e.preventDefault();
+                this.classList.remove('drag-over');
+
+                if (!draggedCard) return;
+
+                const targetZone = this;
+                const targetStatus = targetZone.getAttribute('data-status');
+                const sourceStatus = sourceColumn ? sourceColumn.getAttribute('data-status') : '';
+                const ticketId = draggedCard.getAttribute('data-ticket-id');
+
+                if (sourceColumn === targetZone) return;
+
+                // Move in DOM optimistically
+                targetZone.appendChild(draggedCard);
+                updateColumnCounters();
+
+                pendingDrop = {
+                    card: draggedCard,
+                    sourceColumn,
+                    sourceStatus,
+                    targetStatus,
+                    ticketId,
+                    hasAssignee: !!draggedCard.getAttribute('data-assigned-to')
+                };
+                openStatusModal(pendingDrop);
+            });
+        });
+
+        document.getElementById('boardStatusConfirm').addEventListener('click', () => {
+            const p = pendingDrop;
+            if (!p) return;
+            const commentEl = document.getElementById('boardComment');
+            const comment = commentEl.value.trim();
+            if (!comment) {
+                commentEl.classList.add('is-invalid');
+                commentEl.focus();
+                return;
+            }
+            commentEl.classList.remove('is-invalid');
+
+            const selectEl = document.getElementById('boardAssignSelect');
+            const assigneeId = selectEl.value;
+            const assigneeName = selectEl.options[selectEl.selectedIndex].text;
+
+            clearPending();
+            bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+
+            const tasks = [postStatus(p.ticketId, p.targetStatus)];
+            if (assigneeId) tasks.push(postAssign(p.ticketId, assigneeId));
+            tasks.push(postComment(p.ticketId, comment));
+
+            Promise.all(tasks)
+                .then(() => {
+                    if (assigneeId) markAssigned(p.card, assigneeId, assigneeName);
+                    ServiceDesk.showToast(`Ticket #${p.ticketId} moved to ${STATUS_LABELS[p.targetStatus] || p.targetStatus}`, 'success');
+                })
+                .catch(err => {
+                    console.error(err);
+                    restoreCard(p.card, p.sourceColumn);
+                    ServiceDesk.showToast(`Failed to update ticket: ${err.message}`, 'danger');
+                });
+        });
+
+        document.getElementById('boardStatusCancel').addEventListener('click', () => {
+            bootstrap.Modal.getInstance(document.getElementById('statusModal')).hide();
+        });
+
+        document.getElementById('statusModal').addEventListener('hidden.bs.modal', () => {
+            if (pendingDrop) {
+                restoreCard(pendingDrop.card, pendingDrop.sourceColumn);
+                clearPending();
+            }
+        });
+    })();
+</script>
+{% endblock %}

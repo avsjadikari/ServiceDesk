@@ -48,23 +48,22 @@ def _smtp_error_hint(code, server):
     if code in (530, 535):
         return (
             "The SMTP server rejected the username or password. "
-            "Common causes: (1) Google / Microsoft / Yahoo no longer "
-            "accept account passwords over SMTP — you must use an App "
+            "Common causes: Google, Microsoft, and Yahoo no longer "
+            "accept account passwords over SMTP. Use an App "
             "Password (requires 2-Step Verification on the account). "
             "If your Google account does not show the App Passwords "
             "option, 2-Step Verification is not enabled or your "
-            "organisation's policy hides it. (2) The App Password was "
-            "typed with spaces — Google displays it as four 4-character "
-            "groups (e.g. `abcd efgh ijkl mnop`) but the SMTP server "
+            "organisation's policy hides it. The App Password was "
+            "typed with spaces. Google displays it as four 4-character "
+            "groups (e.g. `abcd efgh ijkl mnop`), but the SMTP server "
             "requires the 16 characters with no spaces. This form "
             "strips spaces automatically, so re-paste the password "
-            "and save again. (3) The account password is wrong. (4) "
-            "The username is not a full email address. Easiest "
-            "workaround: use a transactional email provider such as "
-            "Mailgun, SendGrid, Brevo, Amazon SES, Postmark, or your "
-            "own ISP's SMTP relay — they accept ordinary "
-            "username/password credentials and do not require App "
-            "Passwords."
+            "and save again. The account password is wrong, or the "
+            "username is not a full email address. Alternative: use a "
+            "transactional email provider such as Mailgun, SendGrid, "
+            "Brevo, Amazon SES, Postmark, or your own ISP's SMTP "
+            "relay. These accept ordinary username/password "
+            "credentials and do not require App Passwords."
         )
     if code == 421:
         return "The SMTP server is temporarily unavailable. Try again in a few minutes."
@@ -213,7 +212,7 @@ def send_ticket_created(ticket):
         f"Category: {ticket.category}\n"
         f"Status: {ticket.status}\n\n"
         f"Description:\n{ticket.description}\n\n"
-        f"Please login to the ServiceDesk system to view and respond to this ticket."
+        f"Log in to the ServiceDesk system to view and respond to this ticket."
     )
     return send_email(ticket.creator.email, subject, body)
 
@@ -230,7 +229,7 @@ def send_ticket_assigned(ticket):
         f"Category: {ticket.category}\n"
         f"Assigned By: {ticket.creator.full_name}\n\n"
         f"Description:\n{ticket.description}\n\n"
-        f"Please login to the ServiceDesk system to view and respond to this ticket."
+        f"Log in to the ServiceDesk system to view and respond to this ticket."
     )
     return send_email(ticket.assignee.email, subject, body)
 
@@ -243,7 +242,7 @@ def send_ticket_status_changed(ticket, old_status, new_status):
         f"Title: {ticket.title}\n"
         f"Previous Status: {old_status}\n"
         f"New Status: {new_status}\n\n"
-        f"Please login to the ServiceDesk system to view the updated ticket."
+        f"Log in to the ServiceDesk system to view the updated ticket."
     )
     return send_email(ticket.creator.email, subject, body)
 
@@ -256,7 +255,7 @@ def send_ticket_comment(ticket, comment):
         f"Title: {ticket.title}\n"
         f"Comment by: {comment.user.full_name}\n\n"
         f"Comment:\n{comment.content}\n\n"
-        f"Please login to the ServiceDesk system to view the full ticket and all comments."
+        f"Log in to the ServiceDesk system to view the full ticket and all comments."
     )
     return send_email(ticket.creator.email, subject, body)
 
@@ -268,8 +267,8 @@ def send_password_reset(user, reset_url):
         f"We received a request to reset your password.\n\n"
         f"Click the link below to set a new password. The link will expire in 30 minutes:\n"
         f"{reset_url}\n\n"
-        f"If you did not request this, you can safely ignore this email — "
-        f"your password will remain unchanged.\n\n"
+        f"If you did not request this, you can safely ignore this email. "
+        f"Your password will remain unchanged.\n\n"
         f"Thank you,\nServiceDesk Team"
     )
     return send_email(user.email, subject, body, async_=False)
@@ -282,7 +281,7 @@ def send_welcome_email(user):
         f"Welcome to ServiceDesk! Your account has been created.\n\n"
         f"Username: {user.username}\n"
         f"Role: {user.role}\n\n"
-        f"Please login and change your password on first access.\n\n"
+        f"Log in and change your password on first access.\n\n"
         f"Thank you,\nServiceDesk Team"
     )
     return send_email(user.email, subject, body)
@@ -327,8 +326,8 @@ def send_admin_password_reset(user, temporary_password=None, must_change=True):
     if temporary_password and must_change:
         body = (
             f"Hello {user.full_name},\n\n"
-            f"An administrator reset your ServiceDesk password. A temporary password "
-            f"has been set:\n\n"
+            f"An administrator reset your ServiceDesk password and set a "
+            f"temporary password:\n\n"
             f"    {temporary_password}\n\n"
             f"You will be required to choose a new password the next time you sign in.\n\n"
             f"If you did not request this change, contact IT support immediately.\n\n"

@@ -89,16 +89,16 @@
                 {% if not mail_is_configured %}
                 <div class="alert alert-warning small">
                     <i class="bi bi-exclamation-triangle me-1"></i>
-                    Email is not configured. Password resets, ticket notifications
-                    and lock-out alerts will be skipped until you save valid
+                    Email is not configured. Password resets, ticket notifications,
+                    and lock-out alerts won't be sent until you save valid
                     credentials.
                 </div>
                 {% elif not mail_config.MAIL_DEFAULT_SENDER %}
                 <div class="alert alert-info small">
                     <i class="bi bi-info-circle me-1"></i>
-                    No "Default sender" is set. Outgoing messages will use
+                    No “Default sender” is set. Outgoing messages will use
                     the SMTP username as the From address. Set one to control
-                    the display name (e.g. "ServiceDesk &lt;noreply@acme.com&gt;").
+                    the display name (e.g. “ServiceDesk &lt;noreply@acme.com&gt;”).
                 </div>
                 {% endif %}
 
@@ -120,34 +120,34 @@
                                  data-bs-parent="#mailHelp">
                                 <div class="accordion-body small">
                                     <p class="mb-2">
-                                        <strong>Gmail / Google Workspace</strong> &mdash;
+                                        <strong>Gmail / Google Workspace</strong>:
                                         Google no longer accepts account passwords for SMTP.
                                         You need an <em>App Password</em>, which requires
                                         2-Step Verification turned on first. If the
                                         <em>App passwords</em> option is missing from your
                                         Google account, 2-Step Verification is not
-                                        enabled &mdash; enable it, then revisit the
+                                        enabled. Enable it, then revisit the
                                         App Passwords page.
                                     </p>
                                     <p class="mb-2">
-                                        <strong>Outlook / Office 365 / Hotmail</strong>
-                                        &mdash; Same restriction. Enable 2-Step Verification
+                                        <strong>Outlook / Office 365 / Hotmail</strong>:
+                                        Enable 2-Step Verification
                                         and create an App Password at
                                         <code>account.microsoft.com → Security → Advanced
                                         options → App passwords</code>.
                                     </p>
                                     <p class="mb-2">
-                                        <strong>Yahoo</strong> &mdash; Account Key /
-                                        2-Step Verification required, then generate an
+                                        <strong>Yahoo</strong>: Enable Account Key or
+                                        2-Step Verification, then generate an
                                         app password.
                                     </p>
                                     <p class="mb-0">
-                                        <strong>Easiest alternative</strong> &mdash; Use a
+                                        <strong>Alternative</strong>: Use a
                                         transactional email provider
-                                        (Mailgun, SendGrid, Brevo, Postmark, Amazon SES,
-                                        etc.) or your ISP's SMTP relay. These accept
+                                        (Mailgun, SendGrid, Brevo, Postmark, Amazon SES)
+                                        or your ISP's SMTP relay. These accept
                                         ordinary username/password credentials and
-                                        typically use port 587 with TLS.
+                                        use port 587 with TLS.
                                     </p>
                                 </div>
                             </div>
@@ -209,8 +209,9 @@
                                 <i class="bi bi-info-circle me-1"></i>
                                 Spaces are stripped automatically. Google, Microsoft
                                 and Yahoo display App Passwords as four 4-character
-                                groups (e.g. <code>abcd efgh ijkl mnop</code>) &mdash;
-                                paste them with or without spaces; the saved value
+                                groups (e.g. <code>abcd efgh ijkl mnop</code>).
+                                Paste
+                                them with or without spaces; the saved value
                                 is the 16-character form with no spaces.
                             </div>
                         </div>

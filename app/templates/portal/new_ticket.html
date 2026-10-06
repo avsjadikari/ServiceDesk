@@ -41,7 +41,7 @@
             
             <div class="mb-3">
                 {{ form.description.label(class="form-label") }}
-                {{ form.description(class="form-control", rows="6", placeholder="Please describe your issue in detail...") }}
+                {{ form.description(class="form-control", rows="6", placeholder="Please describe your issue in detail…") }}
                 {% if form.description.errors %}
                     <div class="text-danger">
                         {% for error in form.description.errors %}{{ error }}{% endfor %}

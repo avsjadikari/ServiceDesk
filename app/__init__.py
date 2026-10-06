@@ -2,6 +2,7 @@ import os
 import logging
 import secrets
 import uuid
+from datetime import datetime
 
 from flask import (
     Flask,
@@ -195,6 +196,10 @@ def create_app(config_name=None):
             return ""
         return value.strftime(fmt)
 
+    from app.i18n import i18n_bp, load_translations, t, _, SUPPORTED_LANGUAGES
+
+    load_translations()
+
     @app.context_processor
     def inject_globals():
         try:
@@ -206,7 +211,27 @@ def create_app(config_name=None):
         return dict(
             company_name=brand,
             request_id=g.get("request_id"),
+            now=datetime.utcnow,
+            t=t,
+            _=t,
+            current_lang=getattr(g, "lang", "en"),
+            current_lang_dir=getattr(g, "lang_dir", "ltr"),
+            supported_languages=SUPPORTED_LANGUAGES,
         )
+
+    @app.before_request
+    def resolve_language():
+        lang = request.args.get("lang")
+        if lang and lang in SUPPORTED_LANGUAGES:
+            session["lang"] = lang
+        if not lang or lang not in SUPPORTED_LANGUAGES:
+            lang = session.get("lang")
+        if not lang or lang not in SUPPORTED_LANGUAGES:
+            best = request.accept_languages.best_match(list(SUPPORTED_LANGUAGES.keys()))
+            lang = best if best else "en"
+
+        g.lang = lang
+        g.lang_dir = SUPPORTED_LANGUAGES.get(lang, {}).get("dir", "ltr")
 
     @app.before_request
     def assign_request_id():
@@ -254,6 +279,7 @@ def create_app(config_name=None):
     app.register_blueprint(portal_bp)
     app.register_blueprint(api_bp, url_prefix="/api")
     app.register_blueprint(settings_bp)
+    app.register_blueprint(i18n_bp)
 
     # Apply DB-stored mail settings first so Flask-Mail picks them up.
     # Flask-Mail 0.9.1 caches config at init_app time, so the values
@@ -287,6 +313,7 @@ def create_app(config_name=None):
             "main.health",
             "main.ready",
             "static",
+            "i18n.set_language",
         }
         if not request.endpoint or request.endpoint in exempt_endpoints:
             return

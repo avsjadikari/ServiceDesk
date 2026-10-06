@@ -17,7 +17,7 @@
     <div class="card-body">
         <form method="GET" class="row g-3">
             <div class="col-md-5">
-                {{ form.search(class="form-control", placeholder="Search articles...") }}
+                {{ form.search(class="form-control", placeholder="Search articles…") }}
             </div>
             <div class="col-md-3">
                 {{ form.category(class="form-select") }}
@@ -40,7 +40,7 @@
                 <h5 class="card-title">
                     <a href="{{ url_for('knowledge.view', article_id=article.id) }}">{{ article.title }}</a>
                 </h5>
-                <p class="card-text text-muted">{{ article.content[:150] }}...</p>
+                <p class="card-text text-muted">{{ article.content[:150] }}…</p>
                 <div class="d-flex gap-2">
                     <span class="badge bg-secondary">{{ article.category }}</span>
                     {% if article.tags %}

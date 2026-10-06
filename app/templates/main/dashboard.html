@@ -1,133 +1,179 @@
 {% extends "base.html" %}
 
-{% block title %}Dashboard - {{ company_name }}{% endblock %}
+{% block title %}Operational Dashboard - {{ company_name }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="bi bi-speedometer2 me-2"></i>Dashboard</h1>
-    <a href="{{ url_for('tickets.new') }}" class="btn btn-primary">
-        <i class="bi bi-plus me-1"></i>New Ticket
-    </a>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-0">Total Tickets</p>
-                        <h2 class="mb-0">{{ metrics.total }}</h2>
-                    </div>
-                    <div class="text-primary">
-                        <i class="bi bi-ticket-detailed" style="font-size: 2rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-speedometer2 me-2 text-primary"></i>{{ _('Operational Dashboard') }}</h1>
+        <p class="text-muted mb-0">Real-time overview of IT service desk workload, SLA health, and trends.</p>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card warning">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-0">Open Tickets</p>
-                        <h2 class="mb-0">{{ metrics.open }}</h2>
-                    </div>
-                    <div class="text-warning">
-                        <i class="bi bi-exclamation-circle" style="font-size: 2rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card success">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-0">Resolved</p>
-                        <h2 class="mb-0">{{ metrics.resolved }}</h2>
-                    </div>
-                    <div class="text-success">
-                        <i class="bi bi-check-circle" style="font-size: 2rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card {% if sla.compliance_rate < 80 %}danger{% else %}success{% endif %}">
-            <div class="card-body">
-                <div class="d-flex justify-content-between align-items-center">
-                    <div>
-                        <p class="text-muted mb-0">SLA Compliance</p>
-                        <h2 class="mb-0">{{ sla.compliance_rate }}%</h2>
-                    </div>
-                    <div class="{% if sla.compliance_rate < 80 %}text-danger{% else %}text-success{% endif %}">
-                        <i class="bi bi-pie-chart" style="font-size: 2rem;"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
+    <div class="d-flex gap-2">
+        <a href="{{ url_for('tickets.board') }}" class="btn btn-outline-primary">
+            <i class="bi bi-kanban me-1"></i>{{ _('Kanban Board') }}
+        </a>
+        <a href="{{ url_for('tickets.new') }}" class="btn btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>{{ _('New Ticket') }}
+        </a>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-graph-up me-2"></i>Tickets Overview</h5>
-            </div>
+{% if sla_at_risk_count > 0 %}
+<div class="alert alert-danger d-flex align-items-center mb-4 shadow-sm" role="alert">
+    <i class="bi bi-exclamation-triangle-fill fs-4 me-3 flex-shrink-0"></i>
+    <div class="flex-grow-1">
+        <strong>{{ _('Attention') }}:</strong> There are <strong>{{ sla_at_risk_count }}</strong> ticket(s) currently breached or nearing SLA resolution deadline within 4 hours.
+    </div>
+    <a href="{{ url_for('tickets.index') }}?status=in_progress" class="btn btn-sm btn-danger ms-auto">{{ _('Review SLA Queue') }}</a>
+</div>
+{% endif %}
+
+<!-- Key Metrics Row -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card h-100">
             <div class="card-body">
-                <canvas id="ticketsChart" height="100"></canvas>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('Total Tickets') }}</p>
+                        <h2 class="h3 fw-bold mb-0">{{ metrics.total }}</h2>
+                        <small class="text-muted">{{ metrics.closed }} {{ _('Closed') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble">
+                        <i class="bi bi-ticket-detailed"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="col-md-4">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-pie-chart me-2"></i>By Priority</h5>
-            </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card warning h-100">
             <div class="card-body">
-                <canvas id="priorityChart"></canvas>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('Open Tickets') }}</p>
+                        <h2 class="h3 fw-bold mb-0">{{ metrics.open }}</h2>
+                        <small class="text-warning fw-medium">{{ metrics.by_status.get('new', 0) }} {{ _('Unassigned') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble warning">
+                        <i class="bi bi-hourglass-split"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card success h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('Resolved') }}</p>
+                        <h2 class="h3 fw-bold mb-0">{{ metrics.resolved }}</h2>
+                        <small class="text-success fw-medium">{{ _('Resolved') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble success">
+                        <i class="bi bi-check-circle"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card {% if sla.compliance_rate < 80 %}danger{% else %}success{% endif %} h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('SLA Compliance') }}</p>
+                        <h2 class="h3 fw-bold mb-0">{{ sla.compliance_rate }}%</h2>
+                        <small class="{% if sla.compliance_rate < 80 %}text-danger{% else %}text-muted{% endif %}">
+                            {{ sla.breached }} {{ _('Breached') }} / {{ sla.total }}
+                        </small>
+                    </div>
+                    <div class="metric-icon-bubble {% if sla.compliance_rate < 80 %}danger{% else %}success{% endif %}">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
+<!-- Charts Row -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-8">
+        <div class="card h-100">
             <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0"><i class="bi bi-exclamation-triangle me-2"></i>Urgent Tickets</h5>
-                <a href="{{ url_for('tickets.index') }}?priority=critical" class="btn btn-sm btn-outline-primary">View All</a>
+                <h5 class="mb-0 fs-6"><i class="bi bi-graph-up me-2 text-primary"></i>14-Day Activity Trend (Created vs. Resolved)</h5>
+                <a href="{{ url_for('analytics.index') }}" class="btn btn-sm btn-link text-decoration-none">{{ _('Full Analytics') }} &rarr;</a>
             </div>
-            <div class="card-body p-0">
+            <div class="card-body">
+                <div style="height: 260px;">
+                    <canvas id="ticketsTrendChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0 fs-6"><i class="bi bi-pie-chart me-2 text-primary"></i>{{ _('Tickets') }} ({{ _('Priority') }})</h5>
+            </div>
+            <div class="card-body d-flex flex-column justify-content-center">
+                <div style="max-height: 220px; position: relative;">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Urgent & Recent Tickets Row -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fs-6"><i class="bi bi-exclamation-octagon me-2 text-danger"></i>{{ _('Urgent & At-Risk Queue') }}</h5>
+                <a href="{{ url_for('tickets.index') }}?priority=critical" class="btn btn-sm btn-outline-secondary">{{ _('View All') }}</a>
+            </div>
+            <div class="card-body p-0 table-responsive">
                 {% if open_tickets %}
-                <table class="table table-hover mb-0">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{{ _('Ticket') }}</th>
+                            <th>{{ _('Priority') }}</th>
+                            <th>{{ _('SLA Deadline') }}</th>
+                        </tr>
+                    </thead>
                     <tbody>
                         {% for ticket in open_tickets %}
                         <tr>
                             <td>
-                                <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a>
-                                <br>
-                                <small class="text-muted">{{ ticket.title[:40] }}...</small>
+                                <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ ticket.ticket_number }}
+                                </a>
+                                <div class="text-truncate text-muted small" style="max-width: 260px;">
+                                    {{ ticket.title }}
+                                </div>
                             </td>
                             <td>
-                                <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' }}">
-                                    {{ ticket.priority }}
+                                <span class="badge badge-soft badge-soft-{{ 'danger' if ticket.priority in ['critical', 'high'] else 'warning' }}">
+                                    {{ _(ticket.priority) }}
                                 </span>
                             </td>
                             <td>
                                 {% if ticket.is_sla_breached %}
-                                <span class="badge bg-danger">Breached</span>
+                                <span class="badge bg-danger"><i class="bi bi-clock-history me-1"></i>{{ _('Breached') }}</span>
                                 {% elif ticket.sla_deadline %}
-                                <small class="text-danger">{{ ticket.sla_deadline.strftime('%H:%M') }}</small>
+                                <span class="badge badge-soft badge-soft-warning">
+                                    {{ ticket.sla_deadline.strftime('%m/%d %H:%M') }}
+                                </span>
+                                {% else %}
+                                <span class="text-muted small">-</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -135,30 +181,44 @@
                     </tbody>
                 </table>
                 {% else %}
-                <div class="text-center py-4 text-muted">No urgent tickets</div>
+                <div class="text-center py-4 text-muted">
+                    <i class="bi bi-check2-circle fs-3 text-success d-block mb-1"></i>
+                    {{ _('No urgent or breached tickets') }}
+                </div>
                 {% endif %}
             </div>
         </div>
     </div>
     
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-clock-history me-2"></i>Recent Tickets</h5>
+    <div class="col-lg-6">
+        <div class="card h-100">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fs-6"><i class="bi bi-clock-history me-2 text-primary"></i>{{ _('Recent Tickets') }}</h5>
+                <a href="{{ url_for('tickets.index') }}" class="btn btn-sm btn-outline-secondary">{{ _('View All') }}</a>
             </div>
-            <div class="card-body p-0">
-                <table class="table table-hover mb-0">
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>{{ _('Ticket') }}</th>
+                            <th>{{ _('Status') }}</th>
+                            <th>{{ _('Created') }}</th>
+                        </tr>
+                    </thead>
                     <tbody>
-                        {% for ticket in recent_tickets %}
+                        {% for ticket in recent_tickets[:6] %}
                         <tr>
                             <td>
-                                <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a>
-                                <br>
-                                <small class="text-muted">{{ ticket.title[:40] }}...</small>
+                                <a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}" class="fw-semibold text-decoration-none">
+                                    {{ ticket.ticket_number }}
+                                </a>
+                                <div class="text-truncate text-muted small" style="max-width: 260px;">
+                                    {{ ticket.title }}
+                                </div>
                             </td>
                             <td>
-                                <span class="badge bg-{{ 'secondary' if ticket.status == 'closed' else 'success' if ticket.status == 'resolved' else 'warning' }}">
-                                    {{ ticket.status }}
+                                <span class="badge badge-soft badge-soft-{{ 'secondary' if ticket.status == 'closed' else 'success' if ticket.status == 'resolved' else 'primary' if ticket.status == 'new' else 'warning' }}">
+                                    {{ _(ticket.status) }}
                                 </span>
                             </td>
                             <td>
@@ -173,29 +233,53 @@
     </div>
 </div>
 
+<!-- Agent Workload Table -->
 <div class="row">
-    <div class="col-md-12">
+    <div class="col-12">
         <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0"><i class="bi bi-people me-2"></i>Agent Performance</h5>
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fs-6"><i class="bi bi-people me-2 text-primary"></i>{{ _('Team Performance & Resolution Velocity') }}</h5>
+                <span class="text-muted small">{{ performance|length }} active staff member(s)</span>
             </div>
-            <div class="card-body">
-                <table class="table">
-                    <thead>
+            <div class="card-body p-0 table-responsive">
+                <table class="table table-hover align-middle mb-0">
+                    <thead class="table-light">
                         <tr>
-                            <th>Agent</th>
-                            <th>Assigned</th>
-                            <th>Resolved</th>
-                            <th>Avg. Resolution (hrs)</th>
+                            <th>{{ _('Agent') }}</th>
+                            <th>{{ _('Department') }}</th>
+                            <th class="text-center">{{ _('Assigned') }}</th>
+                            <th class="text-center">{{ _('Resolved') }}</th>
+                            <th class="text-end">{{ _('Avg Resolution Time') }}</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for p in performance %}
                         <tr>
-                            <td>{{ p.agent.full_name }}</td>
-                            <td>{{ p.assigned }}</td>
-                            <td>{{ p.resolved }}</td>
-                            <td>{{ "%.1f"|format(p.avg_resolution_hours) }}</td>
+                            <td class="fw-medium">
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                        {{ p.agent.full_name[:2]|upper }}
+                                    </div>
+                                    <div>
+                                        <div>{{ p.agent.full_name }}</div>
+                                        <small class="text-muted">{{ p.agent.email }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td>{{ p.agent.department or '-' }}</td>
+                            <td class="text-center">
+                                <span class="badge badge-soft badge-soft-primary">{{ p.assigned }}</span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge badge-soft badge-soft-success">{{ p.resolved }}</span>
+                            </td>
+                            <td class="text-end fw-semibold">
+                                {{ "%.1f"|format(p.avg_resolution_hours) }} hrs
+                            </td>
+                        </tr>
+                        {% else %}
+                        <tr>
+                            <td colspan="5" class="text-center py-3 text-muted">No agent records found</td>
                         </tr>
                         {% endfor %}
                     </tbody>
@@ -209,28 +293,62 @@
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
 <script nonce="{{ csp_nonce() }}">
-    const ticketsCtx = document.getElementById('ticketsChart').getContext('2d');
-    new Chart(ticketsCtx, {
+    // 14-Day Activity Trend Chart (Area / Line)
+    const trendCtx = document.getElementById('ticketsTrendChart').getContext('2d');
+    new Chart(trendCtx, {
         type: 'line',
         data: {
-            labels: {{ metrics.by_status.keys()|list|tojson }},
-            datasets: [{
-                label: 'Tickets',
-                data: {{ metrics.by_status.values()|list|tojson }},
-                borderColor: '#2563eb',
-                backgroundColor: 'rgba(37, 99, 235, 0.1)',
-                fill: true,
-                tension: 0.4
-            }]
+            labels: {{ trend_data.labels|tojson }},
+            datasets: [
+                {
+                    label: 'Created',
+                    data: {{ trend_data.created|tojson }},
+                    borderColor: '#2563eb',
+                    backgroundColor: 'rgba(37, 99, 235, 0.12)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3
+                },
+                {
+                    label: 'Resolved',
+                    data: {{ trend_data.resolved|tojson }},
+                    borderColor: '#10b981',
+                    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                    borderWidth: 2,
+                    fill: true,
+                    tension: 0.35,
+                    pointRadius: 3
+                }
+            ]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+                mode: 'index',
+                intersect: false
+            },
             plugins: {
-                legend: { display: false }
+                legend: {
+                    position: 'top',
+                    labels: { boxWidth: 12, font: { family: 'Inter' } }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { precision: 0, font: { family: 'Inter' } }
+                },
+                x: {
+                    grid: { display: false },
+                    ticks: { font: { family: 'Inter' } }
+                }
             }
         }
     });
 
+    // Priority Doughnut Chart
     const priorityCtx = document.getElementById('priorityChart').getContext('2d');
     new Chart(priorityCtx, {
         type: 'doughnut',
@@ -238,14 +356,20 @@
             labels: {{ metrics.by_priority.keys()|list|tojson }},
             datasets: [{
                 data: {{ metrics.by_priority.values()|list|tojson }},
-                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#dc2626']
+                backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'bottom' }
-            }
+                legend: {
+                    position: 'bottom',
+                    labels: { boxWidth: 12, font: { family: 'Inter' } }
+                }
+            },
+            cutout: '70%'
         }
     });
 </script>

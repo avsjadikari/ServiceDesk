@@ -7,6 +7,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -71,6 +72,27 @@ def index():
     )
 
     return render_template("tickets/index.html", tickets=tickets, form=form)
+
+
+@tickets.route("/tickets/board")
+@login_required
+def board():
+    if not current_user.is_agent():
+        abort(403)
+
+    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    columns = {
+        "new": [t for t in tickets if t.status == "new"],
+        "assigned": [t for t in tickets if t.status == "assigned"],
+        "in_progress": [t for t in tickets if t.status == "in_progress"],
+        "pending": [t for t in tickets if t.status == "pending"],
+        "resolved": [t for t in tickets if t.status == "resolved"],
+    }
+    return render_template(
+        "tickets/board.html",
+        columns=columns,
+        agents=User.query.filter(User.role.in_(["agent", "admin"])).all(),
+    )
 
 
 @tickets.route("/tickets/new", methods=["GET", "POST"])
@@ -145,6 +167,7 @@ def view(ticket_id):
         comments=comments,
         status_color=status_color,
         priority_color=priority_color,
+        users=User.query.filter(User.role.in_(["agent", "admin"])).all(),
     )
 
 
@@ -193,7 +216,7 @@ def update_status(ticket_id):
         abort(403)
 
     ticket = Ticket.query.get_or_404(ticket_id)
-    new_status = request.form.get("status")
+    new_status = request.json.get("status") if request.is_json else request.form.get("status")
 
     if new_status:
         old_status = ticket.status
@@ -223,7 +246,13 @@ def update_status(ticket_id):
 
         send_ticket_status_changed(ticket, old_status, new_status)
 
+        if request.is_json:
+            return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
+
         flash(f"Ticket status updated to {new_status}.", "success")
+
+    if request.is_json:
+        return jsonify({"success": False, "error": "Invalid status"}), 400
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 

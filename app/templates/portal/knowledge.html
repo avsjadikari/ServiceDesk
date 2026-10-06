@@ -12,7 +12,7 @@
     <div class="card-body">
         <form method="GET" class="row g-3">
             <div class="col-md-7">
-                <input type="text" name="search" class="form-control" placeholder="Search articles..." value="{{ request.args.get('search', '') }}">
+                <input type="text" name="search" class="form-control" placeholder="Search articles…" value="{{ request.args.get('search', '') }}">
             </div>
             <div class="col-md-3">
                 <select name="category" class="form-select">
@@ -43,7 +43,7 @@
                 <h5 class="card-title">
                     <a href="{{ url_for('portal.knowledge_view', article_id=article.id) }}">{{ article.title }}</a>
                 </h5>
-                <p class="card-text text-muted">{{ article.content[:150] }}...</p>
+                <p class="card-text text-muted">{{ article.content[:150] }}…</p>
                 <span class="badge bg-secondary">{{ article.category }}</span>
             </div>
             <div class="card-footer text-muted">

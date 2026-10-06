@@ -56,11 +56,56 @@ def dashboard():
     total_articles = Article.query.filter_by(status="published").count()
     total_assets = Asset.query.count()
 
+    # 14-day trend for dashboard
+    from datetime import datetime, timedelta
+    from sqlalchemy import func
+
+    start_date = datetime.utcnow() - timedelta(days=14)
+    trend_dates = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(15)]
+
+    created_query = (
+        db.session.query(
+            func.date(Ticket.created_at).label("d"),
+            func.count(Ticket.id).label("cnt"),
+        )
+        .filter(Ticket.created_at >= start_date)
+        .group_by(func.date(Ticket.created_at))
+        .all()
+    )
+    created_map = {str(r.d): r.cnt for r in created_query}
+
+    resolved_query = (
+        db.session.query(
+            func.date(Ticket.resolved_at).label("d"),
+            func.count(Ticket.id).label("cnt"),
+        )
+        .filter(Ticket.resolved_at >= start_date, Ticket.resolved_at.isnot(None))
+        .group_by(func.date(Ticket.resolved_at))
+        .all()
+    )
+    resolved_map = {str(r.d): r.cnt for r in resolved_query}
+
+    trend_data = {
+        "labels": [d[5:] for d in trend_dates],  # MM-DD format
+        "created": [created_map.get(d, 0) for d in trend_dates],
+        "resolved": [resolved_map.get(d, 0) for d in trend_dates],
+    }
+
+    # At-risk SLA count (breached or expiring within 4 hours)
+    now = datetime.utcnow()
+    sla_at_risk_count = Ticket.query.filter(
+        Ticket.status.in_(["new", "assigned", "in_progress", "pending"]),
+        Ticket.sla_deadline.isnot(None),
+        Ticket.sla_deadline <= now + timedelta(hours=4),
+    ).count()
+
     return render_template(
         "main/dashboard.html",
         metrics=metrics,
         performance=performance,
         sla=sla,
+        trend_data=trend_data,
+        sla_at_risk_count=sla_at_risk_count,
         recent_tickets=recent_tickets,
         open_tickets=open_tickets,
         total_articles=total_articles,

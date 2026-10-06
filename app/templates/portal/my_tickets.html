@@ -30,7 +30,7 @@
                     <td>
                         <a href="{{ url_for('portal.view_ticket', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a>
                     </td>
-                    <td>{{ ticket.title[:40] }}{% if ticket.title|length > 40 %}...{% endif %}</td>
+                    <td>{{ ticket.title[:40] }}{% if ticket.title|length > 40 %}…{% endif %}</td>
                     <td>{{ ticket.type }}</td>
                     <td>
                         <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">

@@ -11,9 +11,32 @@
     <div class="d-flex gap-2">
         {% if current_user.is_agent() %}
         <a href="{{ url_for('tickets.edit', ticket_id=ticket.id) }}" class="btn btn-outline-primary">
-            <i class="bi bi-pencil me-1"></i>Edit
+            <i class="bi bi-pencil me-1"></i>{{ _('Edit') }}
         </a>
         {% endif %}
+</div>
+</div>
+
+<!-- Visual Lifecycle Stepper -->
+{% set steps = [('new', 'New'), ('assigned', 'Assigned'), ('in_progress', 'In Progress'), ('resolved', 'Resolved'), ('closed', 'Closed')] %}
+{% set status_order = {'new': 1, 'assigned': 2, 'in_progress': 3, 'pending': 3, 'resolved': 4, 'closed': 5} %}
+{% set current_step_num = status_order.get(ticket.status, 1) %}
+
+<div class="card mb-4 px-4 py-2 shadow-sm">
+    <div class="status-stepper">
+        {% for step_key, step_label in steps %}
+        {% set step_num = status_order.get(step_key) %}
+        <div class="step-item {% if step_num < current_step_num %}completed{% elif step_num == current_step_num %}active{% endif %}">
+            <div class="step-dot">
+                {% if step_num < current_step_num %}
+                <i class="bi bi-check-lg" aria-hidden="true"></i>
+                {% else %}
+                {{ loop.index }}
+                {% endif %}
+            </div>
+            <div class="step-label">{{ _(step_label) }}</div>
+        </div>
+        {% endfor %}
     </div>
 </div>
 
@@ -21,7 +44,7 @@
     <div class="col-md-8">
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Description</h5>
+                <h5 class="mb-0">{{ _('Description') }}</h5>
             </div>
             <div class="card-body">
                 <p style="white-space: pre-wrap;">{{ ticket.description | markdown_safe }}</p>
@@ -55,7 +78,7 @@
                 <form method="POST" action="{{ url_for('tickets.add_comment', ticket_id=ticket.id) }}">
                     {{ comment_form.hidden_tag() }}
                     <div class="mb-3">
-                        {{ comment_form.content(class="form-control", rows="3", placeholder="Add a comment...") }}
+                        {{ comment_form.content(class="form-control", rows="3", placeholder="Add a comment…") }}
                     </div>
                     {% if current_user.is_agent() %}
                     <div class="form-check mb-3">
@@ -63,7 +86,9 @@
                         {{ comment_form.is_internal.label(class="form-check-label") }}
                     </div>
                     {% endif %}
-                    <button type="submit" class="btn btn-primary">Add Comment</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="bi bi-chat-dots me-1"></i>Add Comment
+                    </button>
                 </form>
             </div>
         </div>
@@ -73,27 +98,25 @@
                 <h5 class="mb-0">Attachments</h5>
             </div>
             <div class="card-body">
-                {% if ticket.attachments %}
-                <ul class="list-group list-group-flush mb-3">
-                    {% for attachment in ticket.attachments %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center px-0">
+                {% if attachments %}
+                <div class="list-group mb-3">
+                    {% for a in attachments %}
+                    <div class="list-group-item d-flex justify-content-between align-items-center">
                         <div>
                             <i class="bi bi-paperclip me-2"></i>
-                            <a href="{{ url_for('tickets.download_attachment', attachment_id=attachment.id) }}">
-                                {{ attachment.filename }}
+                            <a href="{{ url_for('tickets.download_attachment', attachment_id=a.id) }}">
+                                {{ a.original_filename }}
                             </a>
-                            <span class="text-muted small ms-2">
-                                {{ (attachment.file_size / 1024) | round(1) }} KB
-                                &middot; {{ attachment.created_at.strftime('%Y-%m-%d %H:%M') if attachment.created_at else '' }}
-                            </span>
+                            <small class="text-muted ms-2">({{ a.file_size_human }})</small>
                         </div>
-                    </li>
+                        <small class="text-muted">Uploaded {{ a.created_at.strftime('%m/%d %H:%M') }} by {{ a.uploader.full_name if a.uploader else 'Unknown' }}</small>
+                    </div>
                     {% endfor %}
-                </ul>
+                </div>
                 {% else %}
-                <p class="text-muted text-center mb-3">No attachments</p>
+                <p class="text-muted mb-3">No attachments yet.</p>
                 {% endif %}
-
+                
                 <form method="POST" action="{{ url_for('tickets.upload_attachment', ticket_id=ticket.id) }}" enctype="multipart/form-data">
                     {{ attachment_form.hidden_tag() }}
                     <div class="input-group">
@@ -116,58 +139,60 @@
     <div class="col-md-4">
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">Details</h5>
+                <h5 class="mb-0">{{ _('Details') }}</h5>
             </div>
             <div class="card-body">
                 <table class="table table-sm">
                     <tr>
-                        <td><strong>Type</strong></td>
-                        <td>{{ ticket.type }}</td>
+                        <td><strong>{{ _('Type') }}</strong></td>
+                        <td>{{ _(ticket.type) }}</td>
                     </tr>
                     <tr>
-                        <td><strong>Status</strong></td>
+                        <td><strong>{{ _('Status') }}</strong></td>
                         <td>
                             {% if current_user.is_agent() %}
                             <form method="POST" action="{{ url_for('tickets.update_status', ticket_id=ticket.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <select name="status" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
-                                    <option value="new" {% if ticket.status == 'new' %}selected{% endif %}>New</option>
-                                    <option value="assigned" {% if ticket.status == 'assigned' %}selected{% endif %}>Assigned</option>
-                                    <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>In Progress</option>
-                                    <option value="pending" {% if ticket.status == 'pending' %}selected{% endif %}>Pending</option>
-                                    <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>Resolved</option>
-                                    <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>Closed</option>
+                                    <option value="new" {% if ticket.status == 'new' %}selected{% endif %}>{{ _('New') }}</option>
+                                    <option value="assigned" {% if ticket.status == 'assigned' %}selected{% endif %}>{{ _('Assigned') }}</option>
+                                    <option value="in_progress" {% if ticket.status == 'in_progress' %}selected{% endif %}>{{ _('In Progress') }}</option>
+                                    <option value="pending" {% if ticket.status == 'pending' %}selected{% endif %}>{{ _('Pending') }}</option>
+                                    <option value="resolved" {% if ticket.status == 'resolved' %}selected{% endif %}>{{ _('Resolved') }}</option>
+                                    <option value="closed" {% if ticket.status == 'closed' %}selected{% endif %}>{{ _('Closed') }}</option>
                                 </select>
                             </form>
                             {% else %}
                             <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
-                                {{ ticket.status }}
+                                {{ _(ticket.status) }}
                             </span>
                             {% endif %}
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>Priority</strong></td>
+                        <td><strong>{{ _('Priority') }}</strong></td>
                         <td>
                             <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
-                                {{ ticket.priority }}
+                                {{ _(ticket.priority) }}
                             </span>
                         </td>
                     </tr>
                     <tr>
-                        <td><strong>Category</strong></td>
-                        <td>{{ ticket.category or '-' }}</td>
+                        <td><strong>{{ _('Category') }}</strong></td>
+                        <td>{{ _(ticket.category) if ticket.category else '-' }}</td>
                     </tr>
                     <tr>
-                        <td><strong>Created By</strong></td>
+                        <td><strong>{{ _('Created By') }}</strong></td>
                         <td>{{ ticket.creator.full_name if ticket.creator else '-' }}</td>
                     </tr>
                     <tr>
-                        <td><strong>Assigned To</strong></td>
+                        <td><strong>{{ _('Assigned To') }}</strong></td>
                         <td>
                             {% if current_user.is_agent() and ticket.status != 'closed' %}
                             <form method="POST" action="{{ url_for('tickets.assign', ticket_id=ticket.id) }}" class="d-inline">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                 <select name="assigned_to" class="form-select form-select-sm d-inline-block" style="width: auto;" onchange="this.form.submit()">
-                                    <option value="">Unassigned</option>
+                                    <option value="">{{ _('Unassigned') }}</option>
                                     {% for user in users %}
                                     <option value="{{ user.id }}" {% if ticket.assigned_to == user.id %}selected{% endif %}>{{ user.full_name }}</option>
                                     {% endfor %}

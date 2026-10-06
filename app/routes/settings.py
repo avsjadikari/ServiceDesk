@@ -44,6 +44,25 @@ def _mail_history():
     )
 
 
+def _refresh_mail_state():
+    from app.email_utils import mail as _mail
+
+    state = getattr(_mail, "state", None)
+    if state is None:
+        return
+    cfg = current_app.config
+    # Flask-Mail captures config at init_app; push the merged values onto
+    # the live extension so a long-running process picks up changes to
+    # server, port, TLS or credentials without a restart.
+    state.server = cfg.get("MAIL_SERVER", "127.0.0.1")
+    state.port = cfg.get("MAIL_PORT", 25)
+    state.use_tls = cfg.get("MAIL_USE_TLS", False)
+    state.use_ssl = cfg.get("MAIL_USE_SSL", False)
+    state.username = cfg.get("MAIL_USERNAME")
+    state.password = cfg.get("MAIL_PASSWORD")
+    state.default_sender = cfg.get("MAIL_DEFAULT_SENDER")
+
+
 @settings.route("/", methods=["GET", "POST"])
 @login_required
 def index():
@@ -129,11 +148,7 @@ def update_mail():
     # because it captures config at init_app time.
     try:
         apply_mail_config(current_app._get_current_object())
-        from app.email_utils import mail as _mail
-        _state = getattr(_mail, "state", None)
-        if _state is not None:
-            _state.username = current_app.config.get("MAIL_USERNAME")
-            _state.password = current_app.config.get("MAIL_PASSWORD")
+        _refresh_mail_state()
     except Exception:
         current_app.logger.exception("apply_mail_config failed after save")
 

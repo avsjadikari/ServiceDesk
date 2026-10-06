@@ -1,74 +1,104 @@
 {% extends "portal/base.html" %}
 
-{% block title %}Home - {{ company_name }} Portal{% endblock %}
+{% block title %}{{ _('Self-Service Support Hub') }} - {{ company_name }}{% endblock %}
 
 {% block content %}
-{% if current_user.is_authenticated %}
-<div class="page-header">
-    <h1>Welcome, {{ current_user.full_name }}!</h1>
+<!-- Modern Hero Search Section -->
+<div class="card bg-primary text-white border-0 shadow-sm mb-4" style="background: linear-gradient(135deg, #1e3a8a 0%, #2563eb 100%);">
+    <div class="card-body py-5 text-center">
+        <h1 class="display-6 fw-bold mb-2">{{ _('How can we help you today?') }}</h1>
+        <p class="lead opacity-75 mb-4">Search our knowledge base for answers, setup guides, or open a service request.</p>
+        <div class="row justify-content-center">
+            <div class="col-md-8 col-lg-6">
+                <form action="{{ url_for('portal.knowledge') }}" method="GET">
+                    <div class="input-group input-group-lg shadow-sm">
+                        <span class="input-group-text bg-white border-0 text-muted"><i class="bi bi-search"></i></span>
+                        <input type="text" name="q" class="form-control border-0" placeholder="Type your issue (e.g. WiFi, VPN, Password reset)…">
+                        <button class="btn btn-dark fw-semibold px-4" type="submit">{{ _('Search') }}</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-4 mb-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="feature-icon">
-                    <i class="bi bi-ticket-detailed" style="font-size: 1.5rem;"></i>
+{% if current_user.is_authenticated %}
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-3">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 54px; height: 54px; font-size: 1.5rem;">
+                    <i class="bi bi-ticket-detailed"></i>
                 </div>
-                <h5>Submit a Ticket</h5>
-                <p class="text-muted">Create a new support ticket</p>
-                <a href="{{ url_for('portal.new_ticket') }}" class="btn btn-primary">New Ticket</a>
+                <h5 class="fw-bold">{{ _('Submit a Request') }}</h5>
+                <p class="text-muted small mb-3">Report an IT incident, hardware issue, or request assistance from our team.</p>
+                <a href="{{ url_for('portal.new_ticket') }}" class="btn btn-primary w-100">
+                    <i class="bi bi-plus-circle me-1"></i>{{ _('Create Ticket') }}
+                </a>
             </div>
         </div>
     </div>
     
-    <div class="col-md-4 mb-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="feature-icon">
-                    <i class="bi bi-list-check" style="font-size: 1.5rem;"></i>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-3">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                <div class="bg-success text-white rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 54px; height: 54px; font-size: 1.5rem;">
+                    <i class="bi bi-clock-history"></i>
                 </div>
-                <h5>My Tickets</h5>
-                <p class="text-muted">View and track your tickets</p>
-                <a href="{{ url_for('portal.my_tickets') }}" class="btn btn-outline-primary">View All</a>
+                <h5 class="fw-bold">{{ _('Track My Tickets') }}</h5>
+                <p class="text-muted small mb-3">Review resolution progress, reply to staff notes, and check ticket updates.</p>
+                <a href="{{ url_for('portal.my_tickets') }}" class="btn btn-outline-success w-100">
+                    <i class="bi bi-card-checklist me-1"></i>View My Requests
+                </a>
             </div>
         </div>
     </div>
     
-    <div class="col-md-4 mb-3">
-        <div class="card h-100">
-            <div class="card-body text-center">
-                <div class="feature-icon">
-                    <i class="bi bi-book" style="font-size: 1.5rem;"></i>
+    <div class="col-md-4">
+        <div class="card h-100 border-0 shadow-sm text-center p-3">
+            <div class="card-body d-flex flex-column justify-content-center align-items-center">
+                <div class="bg-info text-white rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 54px; height: 54px; font-size: 1.5rem;">
+                    <i class="bi bi-book"></i>
                 </div>
-                <h5>Knowledge Base</h5>
-                <p class="text-muted">Find answers yourself</p>
-                <a href="{{ url_for('portal.knowledge') }}" class="btn btn-outline-primary">Browse</a>
+                <h5 class="fw-bold">{{ _('Knowledge Center') }}</h5>
+                <p class="text-muted small mb-3">Find instant self-service troubleshooting articles and company policies.</p>
+                <a href="{{ url_for('portal.knowledge') }}" class="btn btn-outline-info w-100">
+                    <i class="bi bi-compass me-1"></i>Explore Articles
+                </a>
             </div>
         </div>
     </div>
 </div>
 {% endif %}
 
-<div class="row">
-    <div class="col-md-12">
-        <h4 class="mb-3">Popular Articles</h4>
-    </div>
+<!-- Popular Articles Section -->
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="h5 fw-bold mb-0"><i class="bi bi-stars text-warning me-2"></i>Recommended Knowledge Articles</h4>
+    <a href="{{ url_for('portal.knowledge') }}" class="btn btn-sm btn-link text-decoration-none">View All Articles &rarr;</a>
+</div>
+
+<div class="row g-3">
     {% for article in recent_articles %}
-    <div class="col-md-4 mb-3">
-        <div class="card h-100">
+    <div class="col-md-4">
+        <div class="card h-100 shadow-sm">
             <div class="card-body">
-                <h6><a href="{{ url_for('portal.knowledge_view', article_id=article.id) }}">{{ article.title }}</a></h6>
-                <p class="text-muted small mb-0">{{ article.content[:100] }}...</p>
+                <span class="badge badge-soft badge-soft-secondary mb-2">{{ article.category }}</span>
+                <h6 class="fw-bold">
+                    <a href="{{ url_for('portal.knowledge_view', article_id=article.id) }}" class="text-decoration-none text-dark">
+                        {{ article.title }}
+                    </a>
+                </h6>
+                <p class="text-muted small mb-0">{{ article.content[:110] }}{% if article.content|length > 110 %}…{% endif %}</p>
             </div>
-            <div class="card-footer text-muted">
-                <small>
-                    <i class="bi bi-eye me-1"></i>{{ article.view_count }}
-                    <span class="mx-2">|</span>
-                    <span class="badge bg-secondary">{{ article.category }}</span>
-                </small>
+            <div class="card-footer bg-transparent border-top-0 d-flex justify-content-between align-items-center text-muted small pt-0">
+                <span><i class="bi bi-eye me-1"></i>{{ article.view_count }} views</span>
+                <span class="text-primary fw-medium">Read guide &rarr;</span>
             </div>
         </div>
+    </div>
+    {% else %}
+    <div class="col-12 text-center py-4 text-muted">
+        <p>No knowledge base articles published yet.</p>
     </div>
     {% endfor %}
 </div>

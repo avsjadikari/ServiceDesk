@@ -35,20 +35,40 @@ def tickets():
         abort(403)
 
     days = request.args.get("days", 30, type=int)
+    if days <= 0 or days > 365:
+        days = 30
 
     start_date = datetime.utcnow() - timedelta(days=days)
+    date_list = [(start_date + timedelta(days=i)).strftime("%Y-%m-%d") for i in range(days + 1)]
 
-    tickets_data = (
+    created_query = (
         db.session.query(
-            func.date(Ticket.created_at).label("date"),
-            func.count(Ticket.id).label("count"),
+            func.date(Ticket.created_at).label("d"),
+            func.count(Ticket.id).label("cnt"),
         )
         .filter(Ticket.created_at >= start_date)
         .group_by(func.date(Ticket.created_at))
         .all()
     )
+    created_map = {str(r.d): r.cnt for r in created_query}
 
-    return jsonify([{"date": str(t.date), "count": t.count} for t in tickets_data])
+    resolved_query = (
+        db.session.query(
+            func.date(Ticket.resolved_at).label("d"),
+            func.count(Ticket.id).label("cnt"),
+        )
+        .filter(Ticket.resolved_at >= start_date, Ticket.resolved_at.isnot(None))
+        .group_by(func.date(Ticket.resolved_at))
+        .all()
+    )
+    resolved_map = {str(r.d): r.cnt for r in resolved_query}
+
+    return jsonify({
+        "labels": date_list,
+        "created": [created_map.get(d, 0) for d in date_list],
+        "resolved": [resolved_map.get(d, 0) for d in date_list],
+        "series": [{"date": d, "count": created_map.get(d, 0), "resolved": resolved_map.get(d, 0)} for d in date_list],
+    })
 
 
 @analytics.route("/analytics/sla")
@@ -58,6 +78,19 @@ def sla():
         abort(403)
 
     sla_data = calculate_sla_compliance()
+
+    resolved_tickets = Ticket.query.filter(Ticket.resolved_at.isnot(None)).all()
+    valid_res_times = [t.resolution_time for t in resolved_tickets if t.resolution_time is not None]
+    avg_mttr = round(sum(valid_res_times) / len(valid_res_times), 1) if valid_res_times else 0.0
+    sla_data["mttr_hours"] = avg_mttr
+
+    active_breached = Ticket.query.filter(
+        Ticket.status.in_(["new", "assigned", "in_progress", "pending"]),
+        Ticket.sla_deadline.isnot(None),
+        Ticket.sla_deadline < datetime.utcnow()
+    ).count()
+    sla_data["active_breached"] = active_breached
+
     return jsonify(sla_data)
 
 

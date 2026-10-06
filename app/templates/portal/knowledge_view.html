@@ -26,6 +26,7 @@
     </div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('knowledge.helpful', article_id=article.id) }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
             <button type="submit" class="btn btn-outline-success">
                 <i class="bi bi-hand-thumbs-up me-1"></i>Yes, it helped
             </button>

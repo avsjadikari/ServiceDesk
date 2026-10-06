@@ -2,27 +2,32 @@
 
 Enterprise IT Service Management system built with Python Flask.
 
-## Features
+## Features:
 
-- **Ticket Management** – Create, assign, track, and resolve support tickets
-- **Knowledge Base** – Self‑service articles with full‑text search
-- **Asset Management** – Track IT assets and link them to tickets
-- **Automation** – Auto‑assignment, SLA management, workflow rules
-- **Analytics** – Dashboard with metrics, charts, and SLA compliance
-- **Self‑Service Portal** – Customer‑facing ticket submission and tracking
-- **Multi‑theme Support** – Blue, green, purple, red, light, and dark themes
-- **Two‑Factor Authentication (2FA)** – TOTP‑based 2FA using authenticator apps
-- **Rate Limiting** – Protection against brute‑force attacks
-- **Email Notifications** – Automatic notifications for ticket events
+- **Ticket Management**: Create, assign, track, and resolve support tickets with SLA deadlines
+- **Kanban Workflow Board**: Interactive HTML5 drag-and-drop workflow board (`/tickets/board`) with instant status transitions
+- **Operational Dashboard**: Real-time metrics, 14-day activity trend chart, SLA breach alert banner, and agent performance tracking
+- **Interactive Analytics**: Deep analytics dashboard with 7/30/90-day timeframes, MTTR calculation, category breakdown, and one-click CSV export
+- **Multi-Language (i18n)**: Zero-dependency JSON catalog localization supporting 7 languages: English (`en`), Spanish (`es`), French (`fr`), German (`de`), Japanese (`ja`), Arabic (`ar` with RTL layout), and Sinhala (`si`)
+- **Self‑Service Customer Portal**: Modern customer portal with search hero, service category cards, knowledge base spotlight, and 5-stage ticket lifecycle stepper
+- **Knowledge Base**: Self‑service articles with full‑text search and category filtering
+- **Asset Management**: Track IT assets, warranty details, and link assets directly to tickets
+- **Automation**: Auto‑assignment, SLA monitoring, and status-based workflow triggers
+- **Multi‑theme Support**: Blue, green, purple, red, light, and dark themes
+- **Two‑Factor Authentication (2FA)**: TOTP‑based 2FA using authenticator apps
+- **Rate Limiting and Security**: Brute‑force protection via Flask-Limiter, account lockout, Talisman security headers, and Bleach XSS sanitization
+- **Email Notifications**: Automatic notifications for ticket events and password resets
 
-## Tech Stack
+## Tech stack:
 
-- **Backend** – Python 3.10+, Flask 3.x
-- **Database** – SQLite (development), PostgreSQL (production) via SQLAlchemy
-- **Authentication** – Flask‑Login with role‑based access control
-- **Frontend** – Bootstrap 5, Chart.js
-- **Forms** – Flask‑WTF
-- **Security** – Flask‑Limiter, PyOTP (2FA), Flask‑Mail
+- **Backend**: Python 3.10+, Flask 3.x
+- **Database**: SQLite (development), PostgreSQL (production) via SQLAlchemy & Flask-Migrate
+- **Authentication**: Flask‑Login with role‑based access control and account lockout
+- **Frontend**: Bootstrap 5, Chart.js, HTML5 Drag-and-Drop, DataTables, RTL CSS
+- **Forms**: Flask‑WTF with CSRF protection
+- **Internationalization**: Lightweight zero-dependency JSON catalogs (`app/i18n.py`)
+- **Security**: Flask‑Limiter, Flask-Talisman, Bleach, PyOTP (2FA), itsdangerous, Flask‑Mail
+
 
 ## Prerequisites
 
@@ -30,16 +35,16 @@ Enterprise IT Service Management system built with Python Flask.
 - PostgreSQL (for production use)
 - `pip` (Python package installer)
 
-## Installation & Setup
+## Installation and setup
 
-### 1. Clone the Repository
+### 1. Clone the repository
 
 ```bash
 git clone <repository‑url>
 cd ServiceDesk
 ```
 
-### 2. Create a Virtual Environment
+### 2. Create a virtual environment
 
 ```bash
 python -m venv venv
@@ -48,13 +53,13 @@ source venv/bin/activate   # Linux/macOS
 venv\Scripts\activate      # Windows
 ```
 
-### 3. Install Python Dependencies
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Create an Environment File
+### 4. Create an environment file
 
 Copy the example file and edit it. A `.env.example` template is shipped in the repository.
 
@@ -80,7 +85,7 @@ python -c "import secrets; print(secrets.token_hex(64))"
 | `FLASK_DEBUG` | no (default `false`) | Must be `false` in production |
 | `TALISMAN_FORCE_HTTPS` | no (default `true` in prod) | Disable only when TLS is terminated upstream |
 
-### 5. Initialise / Migrate the Database
+### 5. Initialise or migrate the database
 
 Schema is now managed with **Flask-Migrate** (Alembic). For an existing deployment that used `db.create_all()`, generate the baseline migration once:
 
@@ -95,7 +100,7 @@ flask db upgrade
 
 The first-time setup wizard (`/setup`) is still available for an empty database; it now uses `db.create_all()` and refuses destructive schema operations in production.
 
-### 6. Run the Development Server
+### 6. Run the development server
 
 ```bash
 python run.py
@@ -103,25 +108,25 @@ python run.py
 
 Open a browser at **http://localhost:5000**.
 
-### 7. First‑Time Setup Wizard (optional)
+### 7. First-time setup wizard (optional)
 
 If the database is empty, the application automatically redirects to the **Setup Wizard** (`/setup`). The wizard will:
 
 1. Ask for the company name
 2. Let you choose the database backend and connection details
-3. Create an initial **admin** account (password you choose in the form – **must be changed on first login**)
+3. Create an initial **admin** account (password you choose in the form; it **must be changed on first login**)
 4. Create default `agent` and `user` demo accounts with **random temporary passwords** logged to the application output – both are forced to change their password on first login
 5. Seed sample knowledge‑base articles
 
 > Retrieve the temporary demo passwords from the application logs (stdout / `docker compose logs web`) immediately after the wizard completes.
 
-## Default Users (after first‑time setup)
+## Default users (after first‑time setup)
 
 | Username | Password source | Role | `must_change_password` |
 |----------|----------------|------|------------------------|
 | admin    | Chosen in wizard | Admin | true |
-| agent    | Random – see logs | Agent | true |
-| user     | Random – see logs | User  | true |
+| agent    | Random (see logs) | Agent | true |
+| user     | Random (see logs) | User  | true |
 
 All three users are flagged with `must_change_password=True` and will be redirected to the *Change Password* page on first login.
 
@@ -138,10 +143,10 @@ docker compose logs -f web     # watch startup / retrieve temp passwords
 
 The stack brings up:
 
-- `web` – gunicorn-served Flask app (multi-stage image, non-root user, healthcheck)
-- `db`  – PostgreSQL 16 with persistent volume
-- `redis` – for rate-limiting / future Celery workers
-- `nginx` – optional TLS reverse-proxy (`--profile proxy`)
+- `web`: gunicorn-served Flask app (multi-stage image, non-root user, healthcheck)
+- `db`: PostgreSQL 16 with persistent volume
+- `redis`: for rate-limiting / future Celery workers
+- `nginx`: optional TLS reverse-proxy (`--profile proxy`)
 
 The container entrypoint automatically runs `flask db upgrade` before starting gunicorn, so schema migrations are applied on every deploy. To skip migrations on a single run, set `SKIP_MIGRATIONS=true`.
 
@@ -152,7 +157,7 @@ docker compose exec web flask db migrate -m "add new field"
 docker compose exec web flask shell
 ```
 
-## Password Policy
+## Password policy:
 
 - Minimum **8** characters (recommended **12+** for production)
 - At least **1** uppercase letter
@@ -162,7 +167,7 @@ docker compose exec web flask shell
 
 The registration and change‑password forms enforce this policy via WTForms validators.
 
-## Running the Test Suite
+## Running the test suite
 
 ```bash
 # Install test dependencies (already in requirements.txt)
@@ -177,26 +182,39 @@ pytest --cov=app --cov-report=html
 
 Coverage reports are written to `htmlcov/`.
 
-## Project Structure
+## Project structure
 
 ```
 ServiceDesk/
 ├── app/                     # Flask application package
 │   ├── __init__.py          # App factory, DB init, blueprint registration
 │   ├── models.py            # SQLAlchemy models (User, Ticket, Article, …)
-│   ├── forms.py            # WTForms definitions
-│   ├── utils.py            # Helper functions (ticket numbers, SLA, automation)
-│   ├── routes/             # Blueprint modules (auth, tickets, knowledge, …)
-│   │   ├── auth.py
-│   │   ├── tickets.py
-│   │   ├── knowledge.py
-│   │   ├── assets.py
-│   │   ├── analytics.py
-│   │   ├── portal.py
-│   │   ├── api.py
-│   │   └── setup.py
-│   └── templates/          # Jinja2 UI templates (grouped by feature)
-├── tests/                  # Pytest suite
+│   ├── forms.py             # WTForms definitions
+│   ├── utils.py             # Helper functions (ticket numbers, SLA, automation)
+│   ├── i18n.py              # Zero-dependency JSON i18n engine & context processor
+│   ├── sanitize.py          # Bleach HTML/markdown sanitization
+│   ├── security.py          # Token serialization & password reset security
+│   ├── email_utils.py       # Notification mailers
+│   ├── translations/        # Lightweight JSON localization catalogs
+│   │   ├── en.json          # English (default)
+│   │   ├── es.json          # Spanish
+│   │   ├── fr.json          # French
+│   │   ├── de.json          # German
+│   │   ├── ja.json          # Japanese
+│   │   ├── ar.json          # Arabic (RTL)
+│   │   └── si.json          # Sinhala
+│   ├── routes/              # Blueprint modules
+│   │   ├── auth.py          # Authentication, 2FA, password reset
+│   │   ├── main.py          # Operational dashboard, /set-lang
+│   │   ├── tickets.py       # Ticket CRUD, Kanban board (/tickets/board)
+│   │   ├── knowledge.py     # Knowledge base articles
+│   │   ├── assets.py        # IT asset management
+│   │   ├── analytics.py     # Interactive analytics, timeframes, CSV export
+│   │   ├── portal.py        # Customer self-service portal
+│   │   ├── api.py           # REST API endpoints
+│   │   └── setup.py         # First-time setup wizard
+│   └── templates/           # Jinja2 UI templates (grouped by feature)
+├── tests/                   # Pytest suite (96 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Entry point (`python run.py`)
 ├── requirements.txt         # Python dependencies
@@ -204,14 +222,16 @@ ServiceDesk/
 └── SPEC.md                  # Full functional specification
 ```
 
-## Security & Hardening (see `SECURITY.md` for full details)
+## Security and hardening
 
-- **CSRF protection** – Flask‑WTF adds tokens to every form.
-- **Password hashing** – Werkzeug's `generate_password_hash` (PBKDF2‑SHA256).
-- **Audit logging** – All user actions are stored in the `audit_logs` table.
-- **Rate limiting** – Global limits (`200 per day, 50 per hour`) plus per‑endpoint limits (e.g., login limited to 5 req/min).
-- **Two‑factor authentication** – TOTP support via PyOTP.
-- **Session security** – Flask‑Login with server‑side session handling.
+- **CSRF protection**: Flask‑WTF adds tokens to every form and AJAX request.
+- **Password hashing**: Werkzeug's `generate_password_hash` (PBKDF2‑SHA256).
+- **Audit logging**: All user actions are stored in the `audit_logs` table.
+- **Rate limiting**: Global limits (`200 per day, 50 per hour`) plus per‑endpoint limits (e.g., login limited to 5 req/min).
+- **Two‑factor authentication**: TOTP support via PyOTP.
+- **Session security**: Flask‑Login with server‑side session handling and fixation protection.
+- **Safe Redirection**: Language switcher verifies referrer host against `request.host_url` preventing open redirects.
+- **XSS Sanitization**: Markdown content safely sanitized with Bleach (`| markdown_safe`).
 
 **Production hardening checklist** (summarised):
 
@@ -219,41 +239,27 @@ ServiceDesk/
 2. Switch `FLASK_ENV` to `production` and set `FLASK_DEBUG=false`.
 3. Serve the app behind a reverse proxy (NGINX/Traefik) with **HTTPS** termination.
 4. Add security headers (CSP, HSTS, X‑Frame‑Options) – e.g., using `flask‑talisman`.
-5. Enable account lockout after repeated failed logins (custom middleware or extend the limiter).
+5. Enable account lockout after repeated failed logins (enforced in `auth.login`).
 6. Configure a real email backend for notifications.
 7. Set up log aggregation and a database backup strategy.
 8. Consider LDAP/AD integration or SSO for enterprise authentication.
-9. Remove the hard‑coded default passwords from the setup wizard or force password change before the wizard completes.
 
-## Missing / Incomplete Scripts & Code Issues
+## Completed modernization and hardening
 
-| File / Feature | Issue | Suggested Fix |
-|---------------|-------|--------------|
-| `app/routes/setup.py` | Uses `generate_password_hash` incorrectly (assigns to `password_hash` directly) and hard‑codes default passwords (`admin123`, `agent123`, `user123`). | Use the `User.set_password()` method and generate random passwords, then force a password reset via email or UI. |
-| `.env.example` | Not shipped; users must create `.env` manually. | Add a minimal `.env.example` to the repo (see the example above). |
-| Database migrations | No migration tool (e.g., Flask‑Migrate) included. | Add Flask‑Migrate to manage schema changes in production. |
-| `SECURITY.md` notes hard‑coded `SECRET_KEY` in `config.py` – the code raises an error if `SECRET_KEY` is missing, but the repository does not provide a way to generate one automatically. | Provide a CLI helper (`hermes config set SECRET_KEY <value>`) or documentation on generating the key. |
-| Rate limiting on many routes | Only the login route is explicitly limited; other potentially sensitive endpoints (password reset, 2FA, API) lack limits. | Add `@limiter.limit` decorators to those routes. |
-| Missing input sanitisation for rendered user content | Templates directly output user‑provided text (e.g., ticket descriptions). | Implement a sanitisation helper (e.g., `bleach`) in `utils.py` and use it before storing/displaying markdown. |
-| No CSRF token on API endpoints | The REST API (`/api/*`) does not enforce CSRF protection. | Either disable CSRF for API (with proper token auth) or switch to token‑based authentication (JWT). |
-| No automated test for the setup wizard | The test suite covers auth, tickets, assets, knowledge but not the first‑time setup flow. | Add a `tests/test_setup.py` that verifies the wizard creates the admin user and writes `.env`. |
-| Hard‑coded password reset token length/pattern | In `email_utils.send_password_reset` the token is generated elsewhere (not shown). Ensure token length meets security policy. |
+| Component / Feature | State | Implementation Details |
+|---------------------|-------|------------------------|
+| Multi-Language (i18n) | **Implemented** | Lightweight zero-dependency JSON catalogs (`app/i18n.py`) supporting English, Spanish, French, German, Japanese, Arabic (with RTL), and Sinhala. Instant language switching at `/set-lang/<code>` with open redirect validation. |
+| Kanban Workflow Board | **Implemented** | Interactive HTML5 drag-and-drop board at `/tickets/board` with 5 workflow columns and optimistic status sync. |
+| Operational Dashboard | **Implemented** | 14-day activity trend chart, real-time SLA breach alert banner, and agent performance tracking metrics. |
+| Interactive Analytics Suite | **Implemented** | Deep analytics at `/analytics` with 7/30/90-day timeframes, MTTR metrics, category distribution, and one-click CSV export. |
+| Customer Support Portal | **Implemented** | Search hero, service categories, knowledge spotlight, and 5-stage ticket lifecycle stepper. |
+| Setup Wizard Security | **Implemented** | Generates secure random temporary passwords via `secrets`, uses `User.set_password()`, enforces `must_change_password`. |
+| Database Migrations | **Implemented** | Flask-Migrate (Alembic) configured for schema versioning. |
+| Environment Config | **Implemented** | `.env.example` shipped in repository; requires explicit `SECRET_KEY`. |
+| Input Sanitization | **Implemented** | `app/sanitize.py` renders markdown safely with Bleach (`| markdown_safe`). |
+| Automated Test Suite | **Implemented** | 96 unit and integration tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
 
-Addressing the items above will improve reliability, security, and developer experience.
 
-## Recommendations & Next Steps
-
-1. **Add `.env.example`** – commit the example file so new developers have a clear starting point.
-2. **Refactor the setup wizard** to:
-   - Generate random passwords (or ask the installer to provide them).
-   - Use `User.set_password()` instead of directly assigning `password_hash`.
-   - Ensure `must_change_password` is set so admins must change their passwords immediately.
-3. **Integrate Flask‑Migrate** for schema versioning.
-4. **Hardening** – add Flask‑Talisman, enable HSTS, CSP, and secure cookie flags.
-5. **Rate‑limit** all authentication‑related endpoints (login, 2FA, password reset, API token endpoints).
-6. **Sanitise** any user‑generated markdown before rendering (use `bleach` or a safe markdown renderer).
-7. **Extend tests** to cover the setup wizard and any newly added security measures.
-8. **Documentation** – update the README (this file) and `SECURITY.md` with the above changes.
 
 ## Contributing
 
@@ -265,4 +271,4 @@ Addressing the items above will improve reliability, security, and developer exp
 
 ## License
 
-MIT License – see the `LICENSE` file.
+MIT License. See the `LICENSE` file.

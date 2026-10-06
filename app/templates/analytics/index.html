@@ -1,147 +1,385 @@
 {% extends "base.html" %}
 
-{% block title %}Analytics - {{ company_name }}{% endblock %}
+{% block title %}{{ _('Analytics') }} & Intelligence - {{ company_name }}{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h1><i class="bi bi-graph-up me-2"></i>Analytics Dashboard</h1>
-</div>
-
-<div class="row mb-4">
-    <div class="col-md-3">
-        <div class="card metric-card">
-            <div class="card-body">
-                <p class="text-muted mb-0">Total Tickets</p>
-                <h2>{{ metrics.total }}</h2>
-            </div>
-        </div>
+<div class="page-header d-flex flex-wrap justify-content-between align-items-center mb-4 gap-2">
+    <div>
+        <h1 class="h3 mb-1"><i class="bi bi-graph-up me-2 text-primary"></i>{{ _('Service Desk Analytics') }}</h1>
+        <p class="text-muted mb-0">Operational performance, SLA metrics, category distributions, and resolution velocity.</p>
     </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card warning">
-            <div class="card-body">
-                <p class="text-muted mb-0">Open Tickets</p>
-                <h2>{{ metrics.open }}</h2>
-            </div>
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group" role="group" id="timeframeFilter">
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-days="7">7 {{ _('Days') }}</button>
+            <button type="button" class="btn btn-primary btn-sm active" data-days="30">30 {{ _('Days') }}</button>
+            <button type="button" class="btn btn-outline-secondary btn-sm" data-days="90">90 {{ _('Days') }}</button>
         </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card success">
-            <div class="card-body">
-                <p class="text-muted mb-0">Resolved</p>
-                <h2>{{ metrics.resolved }}</h2>
-            </div>
-        </div>
-    </div>
-    
-    <div class="col-md-3">
-        <div class="card metric-card {% if sla.compliance_rate < 80 %}danger{% else %}success{% endif %}">
-            <div class="card-body">
-                <p class="text-muted mb-0">SLA Compliance</p>
-                <h2>{{ sla.compliance_rate }}%</h2>
-            </div>
-        </div>
+        <button class="btn btn-outline-primary btn-sm" onclick="ServiceDesk.exportTableToCSV('analyticsTable', 'agent_performance_report.csv')">
+            <i class="bi bi-download me-1"></i>{{ _('Export CSV') }}
+        </button>
     </div>
 </div>
 
-<div class="row mb-4">
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Tickets by Status</h5>
-            </div>
+<!-- Primary Metric Highlights -->
+<div class="row g-3 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card h-100">
             <div class="card-body">
-                <canvas id="statusChart"></canvas>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('Total Volume') }}</p>
+                        <h2 class="h3 fw-bold mb-0" id="kpi-total">{{ metrics.total }}</h2>
+                        <small class="text-muted">{{ metrics.open }} {{ _('Open Tickets') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble">
+                        <i class="bi bi-collection"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="col-md-6">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Tickets by Priority</h5>
-            </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card success h-100">
             <div class="card-body">
-                <canvas id="priorityChart"></canvas>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('SLA Compliance') }}</p>
+                        <h2 class="h3 fw-bold mb-0" id="kpi-sla">{{ sla.compliance_rate }}%</h2>
+                        <small class="text-success fw-medium">{{ sla.met }} met / {{ sla.total }} target</small>
+                    </div>
+                    <div class="metric-icon-bubble success">
+                        <i class="bi bi-shield-check"></i>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
-</div>
 
-<div class="row">
-    <div class="col-md-12">
-        <div class="card">
-            <div class="card-header">
-                <h5 class="mb-0">Agent Performance</h5>
-            </div>
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card warning h-100">
             <div class="card-body">
-                <table class="table">
-                    <thead>
-                        <tr>
-                            <th>Agent</th>
-                            <th>Department</th>
-                            <th>Assigned</th>
-                            <th>Resolved</th>
-                            <th>Avg Resolution (hrs)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('SLA Breaches') }}</p>
+                        <h2 class="h3 fw-bold mb-0 text-danger" id="kpi-breaches">{{ sla.breached }}</h2>
+                        <small class="text-muted">{{ _('Breached') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble danger">
+                        <i class="bi bi-exclamation-diamond"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-sm-6 col-xl-3">
+        <div class="card metric-card h-100">
+            <div class="card-body">
+                <div class="d-flex justify-content-between align-items-center">
+                    <div>
+                        <p class="text-muted text-uppercase fw-semibold small mb-1">{{ _('Avg Resolution (MTTR)') }}</p>
+                        {% set total_res = namespace(hours=0, count=0) %}
                         {% for p in performance %}
-                        <tr>
-                            <td>{{ p.agent.full_name }}</td>
-                            <td>{{ p.agent.department or '-' }}</td>
-                            <td>{{ p.assigned }}</td>
-                            <td>{{ p.resolved }}</td>
-                            <td>{{ "%.1f"|format(p.avg_resolution_hours) }}</td>
-                        </tr>
+                            {% if p.avg_resolution_hours > 0 %}
+                                {% set total_res.hours = total_res.hours + p.avg_resolution_hours %}
+                                {% set total_res.count = total_res.count + 1 %}
+                            {% endif %}
                         {% endfor %}
-                    </tbody>
-                </table>
+                        <h2 class="h3 fw-bold mb-0">
+                            {{ "%.1f"|format(total_res.hours / total_res.count if total_res.count > 0 else 0) }} hrs
+                        </h2>
+                        <small class="text-muted">{{ _('Agent Performance') }}</small>
+                    </div>
+                    <div class="metric-icon-bubble">
+                        <i class="bi bi-speedometer"></i>
+                    </div>
+                </div>
             </div>
         </div>
+    </div>
+</div>
+
+<!-- Trendline Card -->
+<div class="card mb-4">
+    <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0 fs-6"><i class="bi bi-activity me-2 text-primary"></i>{{ _('Tickets') }} Ingestion vs. Resolution Trend</h5>
+        <span class="badge badge-soft badge-soft-primary" id="trend-window-label">Last 30 Days</span>
+    </div>
+    <div class="card-body">
+        <div style="height: 300px;">
+            <canvas id="timeSeriesChart"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- Distribution Breakdown Row -->
+<div class="row g-3 mb-4">
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0 fs-6"><i class="bi bi-pie-chart me-2 text-primary"></i>{{ _('Status') }}</h5>
+            </div>
+            <div class="card-body d-flex align-items-center justify-content-center">
+                <div style="max-height: 240px; width: 100%;">
+                    <canvas id="statusChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0 fs-6"><i class="bi bi-bar-chart me-2 text-primary"></i>{{ _('Priority') }}</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 240px;">
+                    <canvas id="priorityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-4">
+        <div class="card h-100">
+            <div class="card-header">
+                <h5 class="mb-0 fs-6"><i class="bi bi-tags me-2 text-primary"></i>{{ _('Category') }}</h5>
+            </div>
+            <div class="card-body">
+                <div style="height: 240px;">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Agent Leaderboard & Table -->
+<div class="card">
+    <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <h5 class="mb-0 fs-6"><i class="bi bi-people me-2 text-primary"></i>{{ _('Team Performance & Resolution Velocity') }}</h5>
+        <div style="max-width: 250px;">
+            <input type="text" id="agentTableSearch" class="form-control form-control-sm" placeholder="{{ _('Search') }}…">
+        </div>
+    </div>
+    <div class="card-body p-0 table-responsive">
+        <table class="table table-hover align-middle mb-0" id="analyticsTable">
+            <thead class="table-light">
+                <tr>
+                    <th>{{ _('Agent') }}</th>
+                    <th>{{ _('Department') }}</th>
+                    <th class="text-center">{{ _('Assigned') }}</th>
+                    <th class="text-center">{{ _('Resolved') }}</th>
+                    <th class="text-center">{{ _('Status') }}</th>
+                    <th class="text-end">{{ _('Avg Resolution Time') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in performance %}
+                <tr>
+                    <td class="fw-medium">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="bg-primary text-white rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.85rem;">
+                                {{ p.agent.full_name[:2]|upper }}
+                            </div>
+                            <div>
+                                <div>{{ p.agent.full_name }}</div>
+                                <small class="text-muted">{{ p.agent.email }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td>{{ _(p.agent.department) if p.agent.department else _('Unassigned') }}</td>
+                    <td class="text-center">
+                        <span class="badge badge-soft badge-soft-primary">{{ p.assigned }}</span>
+                    </td>
+                    <td class="text-center">
+                        <span class="badge badge-soft badge-soft-success">{{ p.resolved }}</span>
+                    </td>
+                    <td class="text-center">
+                        {% set ratio = (p.resolved / (p.assigned + p.resolved) * 100) if (p.assigned + p.resolved) > 0 else 100 %}
+                        <div class="d-flex align-items-center justify-content-center gap-2">
+                            <div class="progress" style="width: 60px; height: 6px;">
+                                <div class="progress-bar bg-success" style="width: {{ ratio }}%;"></div>
+                            </div>
+                            <small class="fw-semibold">{{ "%.0f"|format(ratio) }}%</small>
+                        </div>
+                    </td>
+                    <td class="text-end fw-semibold">
+                        {{ "%.1f"|format(p.avg_resolution_hours) }} hrs
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="6" class="text-center py-4 text-muted">No agent workload records found</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
     </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
-<script>
+<script nonce="{{ csp_nonce() }}">
+    // Quick search setup
+    ServiceDesk.setupTableFilter('agentTableSearch', 'analyticsTable');
+
+    // 1. Time Series Ingestion Chart
+    let timeSeriesChartInstance = null;
+    const timeSeriesCanvas = document.getElementById('timeSeriesChart');
+
+    function loadTimeSeries(days = 30) {
+        fetch(`{{ url_for('analytics.tickets') }}?days=${days}`)
+            .then(res => res.json())
+            .then(data => {
+                const labels = (data.labels || []).map(d => d.substring(5)); // MM-DD
+                const created = data.created || [];
+                const resolved = data.resolved || [];
+
+                if (timeSeriesChartInstance) {
+                    timeSeriesChartInstance.destroy();
+                }
+
+                timeSeriesChartInstance = new Chart(timeSeriesCanvas.getContext('2d'), {
+                    type: 'line',
+                    data: {
+                        labels: labels,
+                        datasets: [
+                            {
+                                label: 'Tickets Created',
+                                data: created,
+                                borderColor: '#2563eb',
+                                backgroundColor: 'rgba(37, 99, 235, 0.1)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: days > 60 ? 1 : 3
+                            },
+                            {
+                                label: 'Tickets Resolved',
+                                data: resolved,
+                                borderColor: '#10b981',
+                                backgroundColor: 'rgba(16, 185, 129, 0.08)',
+                                borderWidth: 2,
+                                fill: true,
+                                tension: 0.35,
+                                pointRadius: days > 60 ? 1 : 3
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        interaction: { mode: 'index', intersect: false },
+                        plugins: {
+                            legend: { position: 'top', labels: { boxWidth: 12 } }
+                        },
+                        scales: {
+                            y: { beginAtZero: true, ticks: { precision: 0 } },
+                            x: { grid: { display: false } }
+                        }
+                    }
+                });
+            })
+            .catch(err => console.error('Failed to load ticket time-series', err));
+    }
+
+    // Timeframe button listener
+    document.querySelectorAll('#timeframeFilter button').forEach(btn => {
+        btn.addEventListener('click', function () {
+            document.querySelectorAll('#timeframeFilter button').forEach(b => {
+                b.classList.remove('btn-primary', 'active');
+                b.classList.add('btn-outline-secondary');
+            });
+            this.classList.remove('btn-outline-secondary');
+            this.classList.add('btn-primary', 'active');
+
+            const days = this.getAttribute('data-days');
+            document.getElementById('trend-window-label').innerText = `Last ${days} Days`;
+            loadTimeSeries(days);
+        });
+    });
+
+    // Initial load for 30 days
+    loadTimeSeries(30);
+
+    // 2. Status Doughnut Chart
     const statusCtx = document.getElementById('statusChart').getContext('2d');
     new Chart(statusCtx, {
-        type: 'pie',
+        type: 'doughnut',
         data: {
             labels: {{ metrics.by_status.keys()|list|tojson }},
             datasets: [{
                 data: {{ metrics.by_status.values()|list|tojson }},
-                backgroundColor: ['#2563eb', '#0ea5e9', '#f59e0b', '#64748b', '#10b981', '#1e293b']
+                backgroundColor: ['#2563eb', '#0ea5e9', '#f59e0b', '#64748b', '#10b981', '#1e293b'],
+                borderWidth: 2
             }]
         },
         options: {
             responsive: true,
+            maintainAspectRatio: false,
             plugins: {
-                legend: { position: 'right' }
-            }
+                legend: { position: 'right', labels: { boxWidth: 10 } }
+            },
+            cutout: '65%'
         }
     });
 
+    // 3. Priority Horizontal Bar Chart
     const priorityCtx = document.getElementById('priorityChart').getContext('2d');
     new Chart(priorityCtx, {
         type: 'bar',
         data: {
             labels: {{ metrics.by_priority.keys()|list|tojson }},
             datasets: [{
-                label: 'Tickets',
                 data: {{ metrics.by_priority.values()|list|tojson }},
-                backgroundColor: ['#10b981', '#f59e0b', '#ef4444', '#dc2626']
+                backgroundColor: ['#10b981', '#f59e0b', '#f97316', '#ef4444'],
+                borderRadius: 4
             }]
         },
         options: {
+            indexAxis: 'y',
             responsive: true,
-            plugins: {
-                legend: { display: false }
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { beginAtZero: true, ticks: { precision: 0 } }
             }
         }
     });
+
+    // 4. Category Breakdown via API
+    fetch("{{ url_for('analytics.categories') }}")
+        .then(res => res.json())
+        .then(cats => {
+            const catCtx = document.getElementById('categoryChart').getContext('2d');
+            const labels = cats.map(c => c.category);
+            const data = cats.map(c => c.count);
+
+            new Chart(catCtx, {
+                type: 'bar',
+                data: {
+                    labels: labels.length ? labels : ['None'],
+                    datasets: [{
+                        label: 'Tickets',
+                        data: data.length ? data : [0],
+                        backgroundColor: '#6366f1',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: {
+                        y: { beginAtZero: true, ticks: { precision: 0 } },
+                        x: { grid: { display: false } }
+                    }
+                }
+            });
+        })
+        .catch(err => console.error('Failed to load categories', err));
 </script>
 {% endblock %}

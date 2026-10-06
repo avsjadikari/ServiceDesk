@@ -135,12 +135,12 @@ def complete_login(user, remember_me=False):
 def login_2fa():
     user_id = session.get("pre_2fa_user_id")
     if not user_id:
-        flash("Session expired. Please login again.", "warning")
+        flash("Session expired. Please log in again.", "warning")
         return redirect(url_for("auth.login"))
 
     user = User.query.get(user_id)
     if not user:
-        flash("User not found. Please login again.", "danger")
+        flash("User not found. Please log in again.", "danger")
         return redirect(url_for("auth.login"))
 
     use_recovery = request.form.get("use_recovery")
@@ -689,11 +689,14 @@ def unlock_user(user_id):
 def _generate_recovery_codes(user):
     """Generate 8 one-time recovery codes, store hashed, return plaintext list."""
     import secrets as _secrets
+    import string
     from werkzeug.security import generate_password_hash
 
     plaintext_codes = []
     for _ in range(8):
-        code = _secrets.token_uppercase(10)
+        code = "".join(
+            _secrets.choice(string.ascii_uppercase + string.digits) for _ in range(10)
+        )
         plaintext_codes.append(code)
         rc = RecoveryCode(
             user_id=user.id,
