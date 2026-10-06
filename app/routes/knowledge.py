@@ -34,7 +34,11 @@ def index():
 
 @knowledge.route("/knowledge/<int:article_id>")
 def view(article_id):
-    article = Article.query.get_or_404(article_id)
+    article = (
+        Article.query.filter(
+            Article.id == article_id, Article.status == "published"
+        ).first_or_404()
+    )
     article.view_count += 1
     db.session.commit()
 

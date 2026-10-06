@@ -1,5 +1,5 @@
 import pytest
-from app.models import Ticket, User
+from app.models import Attachment, Ticket, User
 
 
 class TestTicketCreation:
@@ -112,6 +112,44 @@ class TestTicketAccess:
             response = client.get(f"/tickets/{ticket.id}")
             assert response.status_code == 403
 
+    def test_reporter_can_upload_and_download_attachment(
+        self, client, app, db, regular_user
+    ):
+        """Regression: ``_can_view_ticket`` referenced the non-existent
+        ``reporter_id`` attribute (the column is ``created_by``), so every
+        non-agent upload/download raised AttributeError and returned 500."""
+        import io
+
+        with app.app_context():
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+
+            ticket = Ticket(
+                ticket_number="TKT-000900",
+                title="Test",
+                description="Test",
+                created_by=regular_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/attachments",
+                data={"file": (io.BytesIO(b"attachment content"), "note.txt")},
+                content_type="multipart/form-data",
+                follow_redirects=False,
+            )
+            assert response.status_code == 302
+
+            attachment = Attachment.query.filter_by(ticket_id=ticket.id).first()
+            assert attachment is not None
+
+            response = client.get(f"/attachments/{attachment.id}")
+            assert response.status_code == 200
+            assert response.data == b"attachment content"
+
 
 class TestTicketStatus:
     """Test ticket status management"""
@@ -212,3 +250,71 @@ class TestTicketAssignment:
             ticket = Ticket.query.get(ticket.id)
             assert ticket.assigned_to == agent_user.id
             assert ticket.status == "assigned"
+
+    def test_assign_ticket_to_regular_user_rejected(
+        self, client, app, db, admin_user, regular_user
+    ):
+        """Regression: assigning a ticket to a non-agent must be rejected
+        instead of silently assigning a regular user."""
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            ticket = Ticket(
+                ticket_number="TKT-000901",
+                title="Test",
+                description="Test",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/assign",
+                data={"assigned_to": str(regular_user.id)},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"must be an agent or admin" in response.data
+
+            ticket = Ticket.query.get(ticket.id)
+            assert ticket.assigned_to is None
+            assert ticket.status == "new"
+
+    def test_assign_ticket_to_unknown_user_rejected(
+        self, client, app, db, admin_user
+    ):
+        """Regression: an assignee id with no matching user must not
+        raise IntegrityError (500); it redirects with a flash."""
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            ticket = Ticket(
+                ticket_number="TKT-000902",
+                title="Test",
+                description="Test",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/assign",
+                data={"assigned_to": "999999"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Assignee does not exist" in response.data
+
+            ticket = Ticket.query.get(ticket.id)
+            assert ticket.assigned_to is None
+            assert ticket.status == "new"

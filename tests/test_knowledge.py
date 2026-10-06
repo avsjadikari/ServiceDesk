@@ -129,3 +129,31 @@ class TestKnowledgeBase:
 
             article = Article.query.get(article.id)
             assert article.view_count == 1
+
+    def test_draft_article_not_viewable_by_id(self, client, app, db, admin_user):
+        """Regression: article detail routes used get_or_404 without a
+        published filter, so draft/archived content was readable by ID —
+        including by unauthenticated portal visitors."""
+        with app.app_context():
+            article = Article(
+                title="Draft Article",
+                content="Internal draft content",
+                category="Security",
+                author_id=admin_user.id,
+                status="draft",
+            )
+            db.session.add(article)
+            db.session.commit()
+
+            response = client.get(f"/knowledge/{article.id}")
+            assert response.status_code == 404
+
+            response = client.get(f"/portal/knowledge/{article.id}")
+            assert response.status_code == 404
+
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            response = client.get(f"/api/articles/{article.id}")
+            assert response.status_code == 404

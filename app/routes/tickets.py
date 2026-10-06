@@ -230,7 +230,21 @@ def assign(ticket_id):
     assignee_id = request.form.get("assigned_to")
 
     if assignee_id:
-        ticket.assigned_to = int(assignee_id)
+        try:
+            assignee_id = int(assignee_id)
+        except (TypeError, ValueError):
+            flash("Invalid assignee.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+        assignee = User.query.get(assignee_id)
+        if assignee is None or not assignee.is_active:
+            flash("Assignee does not exist.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket_id))
+        if not assignee.is_agent():
+            flash("Assignee must be an agent or admin.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+        ticket.assigned_to = assignee_id
         if ticket.status == "new":
             ticket.status = "assigned"
         db.session.commit()
@@ -320,7 +334,7 @@ def _can_view_ticket(ticket):
         return False
     if current_user.is_agent():
         return True
-    return ticket.reporter_id == current_user.id
+    return ticket.created_by == current_user.id
 
 
 def _attachment_allowed(filename, mime_type):

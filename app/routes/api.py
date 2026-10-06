@@ -160,7 +160,22 @@ def update_ticket(ticket_id):
     if "category" in data:
         ticket.category = (data["category"] or "").strip() or None
     if "assigned_to" in data:
-        ticket.assigned_to = data["assigned_to"]
+        assignee_id = data["assigned_to"]
+        if assignee_id is None:
+            ticket.assigned_to = None
+        else:
+            try:
+                assignee_id = int(assignee_id)
+            except (TypeError, ValueError):
+                return jsonify({"error": "assigned_to must be a user id"}), 400
+            assignee = User.query.get(assignee_id)
+            if assignee is None or not assignee.is_active:
+                return jsonify({"error": "Assignee does not exist"}), 400
+            if not assignee.is_agent():
+                return jsonify(
+                    {"error": "Assignee must be an agent or admin"}
+                ), 400
+            ticket.assigned_to = assignee_id
 
     db.session.commit()
 
@@ -220,7 +235,11 @@ def get_articles():
 @api.route("/articles/<int:article_id>", methods=["GET"])
 @login_required
 def get_article(article_id):
-    article = Article.query.get_or_404(article_id)
+    article = (
+        Article.query.filter(
+            Article.id == article_id, Article.status == "published"
+        ).first_or_404()
+    )
 
     return jsonify(
         {

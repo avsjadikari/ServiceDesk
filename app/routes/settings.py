@@ -9,6 +9,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 
+from app import limiter
 from app.forms import MailSettingsForm, SystemSettingsForm, TestEmailForm
 from app.models import AuditLog
 from app.settings_store import (
@@ -165,6 +166,7 @@ def update_mail():
 
 @settings.route("/mail/test", methods=["POST"])
 @login_required
+@limiter.limit("3 per minute")
 def test_mail():
     if not current_user.is_admin():
         flash("Only administrators can test the mail server.", "danger")

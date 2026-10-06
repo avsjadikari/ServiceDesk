@@ -85,6 +85,35 @@ class TestAuthentication:
         response = client.get("/change-password", follow_redirects=True)
         assert b"login" in response.data.lower()
 
+    def test_login_next_rejects_protocol_relative_url(self, client, app, admin_user):
+        """Regression: ``next=//evil.com`` must not redirect off-site.
+
+        The old guard only checked ``startswith("/")``, which a
+        protocol-relative URL like ``//evil.com`` satisfies.
+        """
+        with app.app_context():
+            response = client.post(
+                "/login?next=//evil.com",
+                data={"username": "admin", "password": "Admin@123456"},
+                follow_redirects=False,
+            )
+            assert response.status_code == 302
+            location = response.headers.get("Location", "")
+            assert "evil.com" not in location
+            assert location.endswith("/dashboard")
+
+    def test_login_next_allows_relative_path(self, client, app, admin_user):
+        """A same-site relative ``next`` still works."""
+        with app.app_context():
+            response = client.post(
+                "/login?next=/tickets",
+                data={"username": "admin", "password": "Admin@123456"},
+                follow_redirects=False,
+            )
+            assert response.status_code == 302
+            location = response.headers.get("Location", "")
+            assert location.endswith("/tickets")
+
 
 class TestPasswordStrength:
     """Test password strength validation"""

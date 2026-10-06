@@ -60,7 +60,7 @@ class SetupForm(FlaskForm):
         "Admin Full Name", validators=[DataRequired(), Length(max=128)]
     )
     admin_password = PasswordField(
-        "Admin Password", validators=[DataRequired(), Length(min=6)]
+        "Admin Password", validators=[DataRequired(), Length(min=8)]
     )
 
 

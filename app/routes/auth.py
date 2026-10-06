@@ -1,4 +1,5 @@
 from datetime import datetime
+from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
@@ -116,8 +117,10 @@ def complete_login(user, remember_me=False):
         return redirect(url_for("auth.change_password"))
 
     next_page = request.args.get("next")
-    if next_page and not next_page.startswith("/"):
-        next_page = None
+    if next_page:
+        parts = urlsplit(next_page)
+        if parts.scheme or parts.netloc:
+            next_page = None
     if not next_page:
         next_page = (
             url_for("main.dashboard")
@@ -211,14 +214,13 @@ def forgot_password():
                     "send_password_reset failed user_id=%s", user.id
                 )
 
-            # Always log the URL so support staff can deliver it manually
-            # when mail is not configured. Use a dedicated event name so it
-            # is greppable.
+            # Log the account for greppability, but never the reset URL or
+            # token: a 30-minute-valid link in logs is an account-takeover
+            # vector if logs leak.
             current_app.logger.info(
-                "forgot_password reset_url user_id=%s username=%s url=%s",
+                "forgot_password reset_requested user_id=%s username=%s",
                 user.id,
                 user.username,
-                reset_url,
             )
 
         # Always respond the same to prevent user enumeration.
@@ -305,6 +307,7 @@ def logout():
 
 
 @auth.route("/register", methods=["GET", "POST"])
+@limiter.limit("3 per minute")
 def register():
     if current_user.is_authenticated:
         return redirect(url_for("main.dashboard"))
@@ -489,11 +492,10 @@ def admin_reset_password(user_id):
 
         current_app.logger.info(
             "admin_password_reset admin_user_id=%s target_user_id=%s "
-            "target_username=%s temporary_password=%s delivered_via=%s",
+            "target_username=%s delivered_via=%s",
             current_user.id,
             target.id,
             target.username,
-            new_password,
             "email" if email_sent else "manual",
         )
 

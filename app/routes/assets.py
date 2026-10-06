@@ -137,9 +137,20 @@ def assign(asset_id):
     user_id = request.form.get("user_id")
 
     if user_id:
-        asset.assigned_to = int(user_id)
+        try:
+            user_id = int(user_id)
+        except (TypeError, ValueError):
+            flash("Invalid user.", "danger")
+            return redirect(url_for("assets.view", asset_id=asset_id))
+
+        user = User.query.get(user_id)
+        if user is None or not user.is_active:
+            flash("User does not exist.", "danger")
+            return redirect(url_for("assets.view", asset_id=asset_id))
+
+        asset.assigned_to = user_id
         db.session.commit()
 
-        flash(f"Asset assigned successfully.", "success")
+        flash("Asset assigned successfully.", "success")
 
     return redirect(url_for("assets.view", asset_id=asset_id))
