@@ -146,6 +146,12 @@ def create_app(config_name=None):
             session_cookie_secure=app.config.get("SESSION_COOKIE_SECURE", True),
         )
 
+    if "csp_nonce" not in app.jinja_env.globals:
+
+        @app.template_global()
+        def csp_nonce() -> str:
+            return getattr(request, "csp_nonce", "")
+
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Please log in to access this page."
     login_manager.session_protection = "strong"

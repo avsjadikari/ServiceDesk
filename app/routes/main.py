@@ -66,28 +66,3 @@ def dashboard():
         total_articles=total_articles,
         total_assets=total_assets,
     )
-
-
-@main.route("/my-tickets")
-@login_required
-def my_tickets():
-    if current_user.is_agent():
-        tickets = (
-            Ticket.query.filter(Ticket.assigned_to == current_user.id)
-            .order_by(Ticket.created_at.desc())
-            .all()
-        )
-    else:
-        tickets = (
-            Ticket.query.filter_by(created_by=current_user.id)
-            .order_by(Ticket.created_at.desc())
-            .all()
-        )
-
-    return render_template("main/my_tickets.html", tickets=tickets)
-
-
-@main.route("/settings")
-@login_required
-def settings():
-    return render_template("main/settings.html")

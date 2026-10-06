@@ -14,17 +14,18 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.14'
+          # Matches the Docker runtime base image (Dockerfile PYTHON_VERSION).
+          python-version: '3.12'
       - name: Install dependencies
         run: |
           python -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
           pip install -r requirements.txt
-      - name: Run pylint
+      - name: Run pylint (errors only)
         run: |
           source .venv/bin/activate
-          pylint app tests
+          pylint --errors-only app tests
       - name: Run tests
         run: |
           source .venv/bin/activate

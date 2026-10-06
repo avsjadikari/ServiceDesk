@@ -487,3 +487,38 @@ class TestAdminAccountManagement:
                 },
             )
             assert response.status_code == 302
+
+
+class TestRecoveryCodes:
+    """Regression: recovery codes must use a real stdlib primitive."""
+
+    def test_generate_recovery_codes(self, app, db, regular_user):
+        """Generate 8 usable alphanumeric codes stored only as hashes.
+
+        Regression: the old code called ``secrets.token_uppercase``, which
+        does not exist in the stdlib (AttributeError at 2FA enable)."""
+        import secrets
+
+        from app.models import RecoveryCode
+        from app.routes.auth import _generate_recovery_codes
+        from werkzeug.security import check_password_hash
+
+        alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+        with app.app_context():
+            codes = _generate_recovery_codes(regular_user)
+            assert len(codes) == 8
+            for code in codes:
+                assert len(code) == 10
+                assert all(c in alphabet for c in code)
+
+            stored = RecoveryCode.query.filter_by(user_id=regular_user.id).all()
+            assert len(stored) == 8
+            for code, row in zip(codes, stored):
+                assert code not in row.code_hash  # never stored in plaintext
+                assert check_password_hash(row.code_hash, code)
+
+            assert all(
+                not secrets.compare_digest(a, b)
+                for i, a in enumerate(codes)
+                for b in codes[:i] + codes[i + 1:]
+            )
