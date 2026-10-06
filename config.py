@@ -33,6 +33,11 @@ class Config:
 
     COMPANY_NAME = os.environ.get("COMPANY_NAME", "ServiceDesk")
 
+    # Canonical public host used when building external URLs (e.g. password
+    # reset links). When set, request Host headers are ignored for these URLs,
+    # preventing Host-header poisoning. Leave unset in local development.
+    SERVER_NAME = os.environ.get("SERVER_NAME")
+
     SQLALCHEMY_DATABASE_URI = get_database_uri()
     SQLALCHEMY_TRACK_MODIFICATIONS = False
     SQLALCHEMY_ENGINE_OPTIONS = {

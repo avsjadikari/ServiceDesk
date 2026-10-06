@@ -30,6 +30,17 @@ from app.utils import log_audit
 auth = Blueprint("auth", __name__)
 
 
+def _external_url(endpoint, **values):
+    """Build an absolute URL from the configured SERVER_NAME when available.
+
+    Prevents Host-header poisoning: the canonical host set by the operator wins
+    over the caller-controlled Host header. Falls back to the request host in
+    local development where SERVER_NAME is unset.
+    """
+    host = current_app.config.get("SERVER_NAME") or request.host
+    return url_for(endpoint, _external=True, _host=host, **values)
+
+
 @auth.route("/login", methods=["GET", "POST"])
 @limiter.limit("5 per minute")
 def login():
@@ -200,7 +211,7 @@ def forgot_password():
 
         if user and user.is_active:
             token = generate_password_reset_token(user.id)
-            reset_url = url_for("auth.reset_password", token=token, _external=True)
+            reset_url = _external_url("auth.reset_password", token=token)
             try:
                 from app.email_utils import send_password_reset
 

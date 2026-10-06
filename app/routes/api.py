@@ -1,6 +1,11 @@
 from flask import Blueprint, jsonify, request
 from flask_login import login_required, current_user
 from app import db, limiter
+from app.enums import (
+    TICKET_PRIORITIES,
+    TICKET_STATUSES,
+    TICKET_TYPES,
+)
 from app.models import Ticket, Article, Asset, User
 from app.utils import (
     get_ticket_metrics,
@@ -10,9 +15,9 @@ from app.utils import (
     log_audit,
 )
 
-VALID_TICKET_TYPES = {"incident", "service_request", "problem", "change"}
-VALID_TICKET_STATUSES = {"new", "open", "in_progress", "resolved", "closed"}
-VALID_TICKET_PRIORITIES = {"low", "medium", "high", "critical"}
+VALID_TICKET_TYPES = set(TICKET_TYPES)
+VALID_TICKET_STATUSES = set(TICKET_STATUSES)
+VALID_TICKET_PRIORITIES = set(TICKET_PRIORITIES)
 
 api = Blueprint("api", __name__)
 

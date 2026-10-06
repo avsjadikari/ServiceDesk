@@ -3,6 +3,7 @@ from flask_login import UserMixin
 from sqlalchemy import CheckConstraint
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
+from app.enums import TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES
 
 
 class User(UserMixin, db.Model):
@@ -110,16 +111,18 @@ class Ticket(db.Model):
     __tablename__ = "tickets"
     __table_args__ = (
         CheckConstraint(
-            "status IN ('new', 'assigned', 'in_progress', 'pending', "
-            "'resolved', 'closed')",
+            "status IN (%s)"
+            % ", ".join("'%s'" % s for s in TICKET_STATUSES),
             name="ck_tickets_status",
         ),
         CheckConstraint(
-            "priority IN ('low', 'medium', 'high', 'critical')",
+            "priority IN (%s)"
+            % ", ".join("'%s'" % p for p in TICKET_PRIORITIES),
             name="ck_tickets_priority",
         ),
         CheckConstraint(
-            "type IN ('incident', 'request', 'problem')",
+            "type IN (%s)"
+            % ", ".join("'%s'" % t for t in TICKET_TYPES),
             name="ck_tickets_type",
         ),
     )

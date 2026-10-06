@@ -68,6 +68,29 @@ def wizard():
 
     form = SetupForm()
 
+    # In production the wizard is the trusted one-time bootstrap, so require
+    # evidence that the operator prepared it (SETUP_TOKEN env). Prevents a
+    # remote attacker from racing the real admin to create the first account.
+    if not _is_dev_mode():
+        expected = current_app.config.get("SETUP_TOKEN") or os.environ.get(
+            "SETUP_TOKEN", ""
+        )
+        provided = (request.form.get("setup_token") or "").strip()
+        if not expected or provided != expected:
+            if request.method == "POST":
+                flash(
+                    "Setup token is invalid. The server administrator must set "
+                    "SETUP_TOKEN before first-run setup can complete.",
+                    "danger",
+                )
+            return render_template(
+                "setup/wizard.html",
+                company_name=os.environ.get("COMPANY_NAME", "ServiceDesk"),
+                form=form,
+                require_setup_token=bool(expected),
+                setup_token_unconfigured=not bool(expected),
+            )
+
     if form.validate_on_submit():
         admin_username = form.admin_username.data
         admin_email = form.admin_email.data
@@ -82,9 +105,15 @@ def wizard():
         db_user = form.db_user.data
         db_password = form.db_password.data
 
-        save_config(
-            db_type, db_host, db_port, db_name, db_user, db_password, company_name
-        )
+        if _is_dev_mode():
+            save_config(
+                db_type, db_host, db_port, db_name, db_user, db_password, company_name
+            )
+        else:
+            current_app.logger.info(
+                "Skipping .env write: production database configuration must "
+                "come from the deployment environment"
+            )
 
         db.create_all()
 
@@ -245,7 +274,13 @@ def wizard():
         return redirect(url_for("main.dashboard"))
 
     company_name = os.environ.get("COMPANY_NAME", "ServiceDesk")
-    return render_template("setup/wizard.html", company_name=company_name, form=form)
+    return render_template(
+        "setup/wizard.html",
+        company_name=company_name,
+        form=form,
+        require_setup_token=False,
+        setup_token_unconfigured=False,
+    )
 
 
 @setup.route("/setup/complete")

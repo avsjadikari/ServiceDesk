@@ -129,6 +129,20 @@
             
             <form method="POST">
                 <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                {% if require_setup_token %}
+                <div class="mb-3">
+                    <label class="form-label" for="setup_token">Setup Token</label>
+                    <input type="password" class="form-control" id="setup_token" name="setup_token" placeholder="Enter the server-side setup token" />
+                    <div class="form-text">Provided by your administrator from the <code>SETUP_TOKEN</code> environment variable.</div>
+                </div>
+                <hr class="my-4">
+                {% elif setup_token_unconfigured %}
+                <div class="alert alert-warning" role="alert">
+                    First-run setup is blocked: the <code>SETUP_TOKEN</code> environment
+                    variable is not configured on the server. Ask the administrator to set
+                    it before completing setup.
+                </div>
+                {% endif %}
                 <div class="step-indicator">
                     <div class="step active">1</div>
                     <div class="step">2</div>

@@ -73,8 +73,9 @@
                             {% if user.account_status == 'disabled' %}
                                 <form method="POST"
                                       action="{{ url_for('auth.enable_user', user_id=user.id) }}"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Re-enable {{ user.username }}?');">
+                                      class="d-inline confirm-action-form"
+                                      data-action="enable"
+                                      data-username="{{ user.username }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit"
                                             class="btn btn-outline-success"
@@ -85,8 +86,9 @@
                             {% else %}
                                 <form method="POST"
                                       action="{{ url_for('auth.disable_user', user_id=user.id) }}"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Disable {{ user.username }}? They will not be able to sign in.');">
+                                      class="d-inline confirm-action-form"
+                                      data-action="disable"
+                                      data-username="{{ user.username }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit"
                                             class="btn btn-outline-warning"
@@ -99,8 +101,9 @@
                             {% if user.account_status == 'locked' %}
                                 <form method="POST"
                                       action="{{ url_for('auth.unlock_user', user_id=user.id) }}"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Unlock {{ user.username }}?');">
+                                      class="d-inline confirm-action-form"
+                                      data-action="unlock"
+                                      data-username="{{ user.username }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <button type="submit"
                                             class="btn btn-outline-success"
@@ -111,8 +114,9 @@
                             {% else %}
                                 <form method="POST"
                                       action="{{ url_for('auth.lock_user', user_id=user.id) }}"
-                                      class="d-inline"
-                                      onsubmit="return confirm('Lock {{ user.username }} for 60 minutes?');">
+                                      class="d-inline confirm-action-form"
+                                      data-action="lock"
+                                      data-username="{{ user.username }}">
                                     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                                     <input type="hidden" name="minutes" value="60">
                                     <button type="submit"
@@ -130,4 +134,24 @@
         </table>
     </div>
 </div>
+<script nonce="{{ csp_nonce() }}">
+    document.addEventListener('DOMContentLoaded', function () {
+        var confirmForms = document.querySelectorAll('.confirm-action-form');
+        confirmForms.forEach(function (form) {
+            form.addEventListener('submit', function (e) {
+                var username = form.getAttribute('data-username') || 'this user';
+                var action = form.getAttribute('data-action');
+                var messages = {
+                    enable: 'Re-enable ' + username + '?',
+                    disable: 'Disable ' + username + '? They will not be able to sign in.',
+                    unlock: 'Unlock ' + username + '?',
+                    lock: 'Lock ' + username + ' for 60 minutes?'
+                };
+                if (!window.confirm(messages[action] || 'Continue?')) {
+                    e.preventDefault();
+                }
+            });
+        });
+    });
+</script>
 {% endblock %}
