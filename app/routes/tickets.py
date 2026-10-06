@@ -165,6 +165,7 @@ def view(ticket_id):
         comment_form=comment_form,
         attachment_form=AttachmentForm(),
         comments=comments,
+        attachments=ticket.attachments.order_by(Attachment.created_at.desc()).all(),
         status_color=status_color,
         priority_color=priority_color,
         users=User.query.filter(User.role.in_(["agent", "admin"])).all(),

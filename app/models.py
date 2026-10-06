@@ -290,6 +290,17 @@ class Attachment(db.Model):
     uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
+    uploader = db.relationship("User", foreign_keys=[uploaded_by])
+
+    @property
+    def file_size_human(self):
+        size = self.file_size or 0
+        for unit in ("B", "KB", "MB", "GB", "TB"):
+            if size < 1024:
+                return "%d %s" % (size, unit) if unit == "B" else "%.1f %s" % (size, unit)
+            size /= 1024
+        return "%.1f PB" % size
+
     def __repr__(self):
         return f"<Attachment {self.filename}>"
 

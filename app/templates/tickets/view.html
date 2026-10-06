@@ -105,7 +105,7 @@
                         <div>
                             <i class="bi bi-paperclip me-2"></i>
                             <a href="{{ url_for('tickets.download_attachment', attachment_id=a.id) }}">
-                                {{ a.original_filename }}
+                                {{ a.filename }}
                             </a>
                             <small class="text-muted ms-2">({{ a.file_size_human }})</small>
                         </div>
