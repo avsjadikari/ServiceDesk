@@ -222,7 +222,7 @@ ServiceDesk/
 │   │   ├── api.py           # REST API endpoints
 │   │   └── setup.py         # First-time setup wizard
 │   └── templates/           # Jinja2 UI templates (grouped by feature)
-├── tests/                   # Pytest suite (96 tests covering all features)
+├── tests/                   # Pytest suite (119 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Entry point (`python run.py`)
 ├── requirements.txt         # Python dependencies
@@ -232,7 +232,7 @@ ServiceDesk/
 
 ## Security and hardening
 
-- **CSRF protection**: Flask‑WTF adds tokens to every form and AJAX request.
+- **CSRF protection**: Flask‑WTF adds tokens to every form and AJAX request, including the `/login-2fa` TOTP verification form.
 - **Password hashing**: Werkzeug's `generate_password_hash` (PBKDF2‑SHA256).
 - **Audit logging**: All user actions are stored in the `audit_logs` table.
 - **Rate limiting**: Global limits (`200 per day, 50 per hour`) plus per‑endpoint limits (e.g., login limited to 5 req/min).
@@ -252,6 +252,13 @@ ServiceDesk/
 7. Set up log aggregation and a database backup strategy.
 8. Consider LDAP/AD integration or SSO for enterprise authentication.
 
+## Known issues
+
+- **Dashboard 500 on unassigned tickets** — `dashboard.html` renders `p.agent.full_name` for the performance table without a `None` guard; if a ticket has no assigned agent, the dashboard raises `TypeError` (HTTP 500). Fix: guard with `p.agent.full_name if p.agent else 'Unassigned'`.
+- **REST API enum mismatch** — `app/routes/api.py` accepts ticket types/statuses (`service_request`, `change`, `open`) that differ from the DB CHECK constraints in `app/models.py`, causing HTTP 500 on some writes. Fix: share one enum module between model and API.
+- **Dependency CVE pins** — `requirements.txt` pins `gunicorn==21.2.0`, `cryptography==43.0.1`, `Pillow==10.4.0`, all of which have published CVEs. Fix: upgrade pins.
+- Remaining open security findings are tracked in `SECURITY.md`.
+
 ## Completed modernization and hardening
 
 | Component / Feature | State | Implementation Details |
@@ -265,7 +272,9 @@ ServiceDesk/
 | Database Migrations | **Implemented** | Flask-Migrate (Alembic) configured for schema versioning. |
 | Environment Config | **Implemented** | `.env.example` shipped in repository; requires explicit `SECRET_KEY`. |
 | Input Sanitization | **Implemented** | `app/sanitize.py` renders markdown safely with Bleach (`| markdown_safe`). |
-| Automated Test Suite | **Implemented** | 96 unit and integration tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
+| Automated Test Suite | **Implemented** | 119 unit and integration tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
+| Ticket Attachment Display | **Implemented** | `tickets/view.html` now lists and renders ticket attachments (filename, uploader, size) with access checks; previously the section was silently blank. |
+| 2FA Login CSRF | **Implemented** | `/login-2fa` renders its CSRF token so the TOTP/recovery POST passes CSRFProtect; previously the 2FA POST was rejected with HTTP 400 (missing token). |
 
 
 

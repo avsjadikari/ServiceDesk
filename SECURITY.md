@@ -10,7 +10,7 @@ This document provides a comprehensive security assessment of the ServiceDesk ap
 
 ### ✅ Implemented Security Features
 
-1. **CSRF Protection**: Flask-WTF CSRF tokens on all forms (time-limited 4h)
+1. **CSRF Protection**: Flask-WTF CSRF tokens on all forms (time-limited 4h) — including the `/login-2fa` TOTP verification form, which renders a hidden `csrf_token` so the POST passes CSRFProtect
 2. **Password Hashing**: Werkzeug's `generate_password_hash` using scrypt / pbkdf2:sha256
 3. **Session Management**: Flask-Login with `session_protection="strong"`, anonymous user shim, secure cookie flags
 4. **Authentication**: Role-based access control (admin, agent, user)
@@ -188,12 +188,13 @@ def sanitize_markdown(text):
 
 ## Hardening & Recent Security Implementation
 
-All security items are implemented and verified with 96 passing tests:
+All security items are implemented and verified with 119 passing tests:
 
 - **1.4 – Password reset flow**: `app/security.py` uses `itsdangerous.URLSafeTimedSerializer` with `PASSWORD_RESET_MAX_AGE`. `/forgot-password` (3/min) and `/reset-password/<token>` (5/min) routes in `app/routes/auth.py` use a single generic success flash to prevent user enumeration. `send_password_reset` in `app/email_utils.py` accepts the reset URL.
 - **1.5 – Account lockout**: `User.is_locked()`, `record_failed_login(max_attempts, lockout_minutes)`, `reset_failed_logins()`. Login route locks the account, sends a `send_account_locked` email, and writes an audit-log entry. Configurable via `LOGIN_MAX_ATTEMPTS` (default 5) and `LOGIN_LOCKOUT_MINUTES` (default 15).
 - **1.6 – Session-fixation**: `complete_login()` calls `session.clear()` before `login_user()` to guarantee the new session ID does not inherit a pre-authentication attacker's session.
 - **1.7 – JSON / request-id logging**: `python-json-logger` formats every log record as JSON; `g.request_id` middleware sets a UUIDv4 per request and the response carries an `X-Request-Id` header.
+- **1.8 – 2FA login CSRF (regression-fixed)**: `auth/login_2fa.html` renders `<input type="hidden" name="csrf_token" value="{{ csrf_token() }}">`; both `render_template("auth/login_2fa.html", ...)` calls in `login_2fa` pass through CSRFProtect, so a TOTP/recovery POST is no longer rejected with HTTP 400 missing-token. `TestTwoFactorCsrf` re-enables CSRF in test to keep it covered.
 - **1.9 – Markdown sanitisation**: `app/sanitize.py` whitelists tags, attributes and protocols (`markdown` + `bleach`). Wired into `app/templates/tickets/view.html`, `app/templates/portal/view_ticket.html`, `app/templates/knowledge/view.html`, `app/templates/portal/knowledge_view.html`.
 - **3.4 – Error handling hygiene**: every `try/except: pass` block in `email_utils.py`, `routes/tickets.py`, and `__init__.py` has been replaced with `current_app.logger.warning`/`exception` calls. Email helpers return `bool`; routes log structured failures.
 - **6.12 – Attachment uploads**: `POST /tickets/<id>/attachments` and `GET /attachments/<id>` in `app/routes/tickets.py`. Filename is run through `werkzeug.utils.secure_filename`, prefixed with a UUIDv4, and re-validated to stay inside `UPLOAD_FOLDER` (path-traversal block). Extension and MIME prefix allow-lists come from `UPLOAD_ALLOWED_EXTENSIONS` and `UPLOAD_ALLOWED_MIME_PREFIXES`. File-size cap = `MAX_CONTENT_LENGTH` (16 MB). Access control: ticket reporter, assignee, or any agent/admin. `tickets/view.html` lists current attachments and renders the upload form.
@@ -202,4 +203,19 @@ All security items are implemented and verified with 96 passing tests:
 - **Sentry**: `SENTRY_DSN` env var turns on `sentry-sdk[flask]` init; never initialised in the `testing` config.
 
 Note: attachment routes depend on `UPLOAD_FOLDER` being writable; the Docker entrypoint chowns `instance/uploads` to the `servicedesk` user. Locally, the directory is created lazily with `os.makedirs(..., exist_ok=True)`.
+
+---
+
+## Open Findings (production-readiness review)
+
+Items verified during the review, not yet remediated:
+
+| Severity | Issue | Location | Remediation |
+|----------|-------|----------|-------------|
+| **HIGH** | Password-reset URL built from `request.host_url` / `request.host`; with no `SERVER_NAME` an attacker-controllable `Host` header poisons the reset link sent to the victim | `app/routes/auth.py` (`forgot_password`, `reset_password`), `app/email_utils.py` | Set `SERVER_NAME` in production config; derive URLs only from configured origin |
+| **HIGH** | Unauthenticated first-run setup wizard: `/setup` is exempt from the setup gate and login, so before the first admin exists an attacker can run setup and set `.env`-backed system values | `app/routes/setup.py`, setup-gate exemptions in `app/__init__.py` | Bootstrap initial admin before opening `/setup`, or gate setup behind a one-time token |
+| **HIGH** | Stored XSS: `{{ user.username }}` interpolated unescaped into inline `onclick`/`onsubmit` handlers (quote-breakout on a crafted username). CSP nonces mitigate in production config only | `app/templates/auth/users.html` (lines ~77, 89, 103, 115), `admin_reset_password.html` (~72) | Replace inline handlers with `addEventListener` + `data-*` attributes |
+| **HIGH** | REST API enum mismatch: `api.py` accepts `service_request`/`change`/`open` which contradict the DB CHECK constraints in `models.py`, yielding HTTP 500s on some writes | `app/routes/api.py:13-14` vs `app/models.py` CHECK constraints | Single shared enum module used by model and API |
+| **MEDIUM** | Dashboard HTTP 500: `p.agent.full_name[:2]` crashes when a performance row has no agent (unassigned ticket) | `app/templates/main/dashboard.html:261` | `None` guard / 'Unassigned' fallback |
+| **MEDIUM** | Published dependency CVEs: `gunicorn==21.2.0` (CVE-2024-6827, CVE-2024-1135), `cryptography==43.0.1` (CVE-2024-12797), `Pillow==10.4.0` | `requirements.txt` | Upgrade pins (`gunicorn>=23`, `cryptography>=44.0.1`, `Pillow>=12`) and re-run suite |
 

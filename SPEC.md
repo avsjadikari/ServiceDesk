@@ -257,9 +257,9 @@ New → Assigned → In Progress → Pending → Resolved → Closed
 ## 6. Endpoints & Feature Routes
 
 ### Authentication
-- POST /auth/login
+- GET /login (LoginPage) / POST /login (email+password credentials; redirects to 2FA when enabled)
+- GET|POST /login-2fa (TOTP code or recovery-code verification; CSRF token rendered & enforced)
 - POST /auth/logout
-- POST /auth/2fa/verify
 - GET /forgot-password
 - POST /reset-password/<token>
 - GET /api/auth/me
@@ -380,7 +380,7 @@ ServiceDesk/
 │       ├── js/              # Client-side scripts (Kanban DND, charts, etc.)
 │       └── img/             # Static assets
 ├── migrations/              # Flask-Migrate / Alembic database migrations
-├── tests/                   # Pytest suite (96 tests covering all features)
+├── tests/                   # Pytest suite (119 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Application entry point
 ├── requirements.txt         # Python dependencies
