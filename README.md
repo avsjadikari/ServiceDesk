@@ -98,6 +98,14 @@ flask db migrate -m "init"  # generate the initial migration
 flask db upgrade
 ```
 
+If the app was previously run with an existing local database (created by the setup wizard via `db.create_all()`) before migrations were introduced, Alembic has no version row yet, so `flask db upgrade` fails. Mark the current schema as the baseline once:
+
+```bash
+flask db stamp head
+```
+
+After that, subsequent `flask db upgrade` calls apply only the migrations built on top of that baseline.
+
 The first-time setup wizard (`/setup`) is still available for an empty database; it now uses `db.create_all()` and refuses destructive schema operations in production.
 
 ### 6. Run the development server
