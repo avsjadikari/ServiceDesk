@@ -18,6 +18,7 @@ __pycache__
 .coverage
 htmlcov
 .coverage.*
+.codegraph
 
 # Local dev artefacts
 .env

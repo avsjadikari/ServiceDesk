@@ -1,0 +1,89 @@
+# syntax=docker/dockerfile:1.7
+# All-in-one Alpine image: embedded NGINX (unprivileged, port 8080) in front of
+# gunicorn (port 8000). Runs SQLite by default; PostgreSQL via env vars, same
+# contract as the Debian Dockerfile.
+#
+# Build:
+#   docker build -f Dockerfile.alpine -t servicedesk:alpine .
+# Run:
+#   docker run --rm -p 8080:8080 \
+#     -e SECRET_KEY=change-me -e SETUP_TOKEN=change-me \
+#     -v servicedesk-data:/app/instance \
+#     servicedesk:alpine
+# Then complete first-run setup at http://127.0.0.1:8080/setup
+#
+# Note: Alpine uses musl, so glibc (manylinux) wheels do not load. All heavy
+# deps here ship musllinux wheels (psycopg-binary, cryptography, Pillow); the
+# toolchain below compiles from source when a wheel is missing.
+
+ARG PYTHON_VERSION=3.12
+
+# ---------- builder ----------
+FROM python:${PYTHON_VERSION}-alpine AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Headers needed if any wheel lacks a musllinux build: libpq for psycopg,
+# libffi/openssl for cryptography, jpeg/zlib/freetype/tiff/webp/lcms2 for Pillow.
+RUN apk add --no-cache \
+        build-base \
+        python3-dev \
+        libffi-dev \
+        openssl-dev \
+        postgresql-dev \
+        zlib-dev \
+        jpeg-dev \
+        freetype-dev \
+        tiff-dev \
+        libwebp-dev \
+        lcms2-dev
+
+WORKDIR /build
+
+COPY requirements.txt .
+RUN pip install --prefix=/install -r requirements.txt
+
+# ---------- runtime ----------
+FROM python:${PYTHON_VERSION}-alpine AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    FLASK_CONFIG=production \
+    PORT=8000 \
+    START_NGINX=true
+
+RUN apk add --no-cache \
+        libpq \
+        nginx \
+        tini \
+        curl \
+        zlib \
+        libjpeg-turbo \
+        freetype \
+        tiff \
+ && addgroup -S -g 1000 servicedesk \
+ && adduser -S -D -H -u 1000 -G servicedesk -s /sbin/nologin servicedesk \
+ && mkdir -p /app /app/instance /app/uploads \
+ && chown -R servicedesk:servicedesk /app
+
+COPY --from=builder /install /usr/local
+WORKDIR /app
+
+# Embedded nginx config + app source.
+COPY docker/nginx-alpine.conf /etc/nginx/nginx.conf
+COPY --chown=servicedesk:servicedesk . /app
+
+USER servicedesk
+
+EXPOSE 8080
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD curl -fsS http://127.0.0.1:8080/health || exit 1
+
+ENTRYPOINT ["/sbin/tini", "--", "/app/docker/entrypoint.sh"]
+CMD ["gunicorn", "--config", "gunicorn.conf.py", "wsgi:app"]

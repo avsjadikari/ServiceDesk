@@ -165,6 +165,28 @@ docker compose exec web flask db migrate -m "add new field"
 docker compose exec web flask shell
 ```
 
+### All-in-one image (Alpine + embedded NGINX)
+
+Prefer a single container with no external services? Build `Dockerfile.alpine`
+(SQLite by default; PostgreSQL still supported via env vars). Embedded NGINX
+sits in front of gunicorn: HTTP on port `8080` (unprivileged, runs as the
+non-root `servicedesk` user), static assets cached by nginx, TLS terminates
+at an external proxy of your choice.
+
+```bash
+docker build -f Dockerfile.alpine -t servicedesk:alpine .
+docker run --rm -p 8080:8080 \
+  -e SECRET_KEY=change-me -e SETUP_TOKEN=change-me \
+  -v servicedesk-data:/app/instance \
+  servicedesk:alpine
+```
+
+Then complete first-run setup at `http://127.0.0.1:8080/setup` and retrieve
+the temporary demo passwords from `docker logs`.
+
+The existing multi-container stack (compose + Debian `Dockerfile`) is
+unchanged and still requires no nginx embedded in the app image.
+
 ## Password policy:
 
 - Minimum **8** characters (recommended **12+** for production)
