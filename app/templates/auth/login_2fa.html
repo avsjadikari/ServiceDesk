@@ -16,7 +16,7 @@
                     </div>
                     
                     <form method="POST">
-                        {{ form.hidden_tag() if form else '' }}
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
                         
                         <div id="totpSection">
                             <div class="mb-3">

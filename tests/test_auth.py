@@ -1,5 +1,33 @@
+import re
+
 import pytest
 from app.models import User
+
+
+class TestTwoFactorCsrf:
+    """Regression: /login-2fa must render a CSRF token when CSRF is enabled."""
+
+    def test_2fa_login_csrf(self, client, app, admin_user):
+        with app.app_context():
+            app.config["WTF_CSRF_ENABLED"] = True
+        with client.session_transaction() as sess:
+            sess["pre_2fa_user_id"] = admin_user.id
+
+        response = client.get("/login-2fa")
+        assert response.status_code == 200
+        match = re.search(rb'name="csrf_token" value="([^"]+)"', response.data)
+        assert match, "login-2fa page must render a CSRF token"
+        token = match.group(1).decode()
+
+        response = client.post("/login-2fa", data={"code": "000000"})
+        assert response.status_code == 400
+        response = client.post(
+            "/login-2fa",
+            data={"csrf_token": token, "code": "000000"},
+            headers={"Referer": "http://localhost/login-2fa"},
+        )
+        assert response.status_code == 200
+        assert b"Invalid verification code" in response.data
 
 
 class TestAuthentication:
