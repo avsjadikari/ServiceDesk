@@ -54,3 +54,4 @@ htmlcov/
 # AI assistant working directories
 .claude/
 .qwen/
+.codegraph/
