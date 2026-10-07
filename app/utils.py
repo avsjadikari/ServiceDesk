@@ -1,8 +1,18 @@
 import re
 from datetime import datetime, timedelta
 from flask import current_app, has_request_context, request
+from flask_login import current_user
 from app import db
+from app.enums import (
+    TICKET_CLOSED_STATUSES,
+    TICKET_OPEN_STATUSES,
+    TICKET_PRIORITIES,
+    TICKET_STATUSES,
+)
 from app.models import Ticket, AuditLog, User
+
+# Shared ticket-domain helpers: numbering, SLA math, audit logging, automation
+# rules, presentation colors, dashboard metrics, and upload sniff validation.
 
 
 def generate_ticket_number():
@@ -55,24 +65,37 @@ def log_audit(
         db.session.commit()
 
 
+def log_ticket_audit(ticket, action, details=None, commit=True):
+    """Record an audit event for a ticket. A ticket row always maps the
+    same way (entity_type="ticket", entity_id=ticket.id, ticket_id=ticket.id),
+    so that decision lives here instead of each route."""
+    log_audit(
+        current_user.id,
+        action,
+        entity_type="ticket",
+        entity_id=ticket.id,
+        ticket_id=ticket.id,
+        details=details,
+        commit=commit,
+    )
+
+
 def get_status_color(status):
     colors = {
-        "new": "primary",
-        "assigned": "info",
-        "in_progress": "warning",
-        "pending": "secondary",
-        "resolved": "success",
-        "closed": "dark",
+        s: c
+        for s, c in zip(
+            TICKET_STATUSES, ("primary", "info", "warning", "secondary", "success", "dark")
+        )
     }
     return colors.get(status, "secondary")
 
 
 def get_priority_color(priority):
     colors = {
-        "low": "success",
-        "medium": "warning",
-        "high": "danger",
-        "critical": "danger",
+        s: c
+        for s, c in zip(
+            TICKET_PRIORITIES, ("success", "warning", "danger", "danger")
+        )
     }
     return colors.get(priority, "secondary")
 
@@ -117,18 +140,16 @@ def parse_tags(tag_string):
 
 def get_ticket_metrics():
     total = Ticket.query.count()
-    open_tickets = Ticket.query.filter(
-        Ticket.status.in_(["new", "assigned", "in_progress", "pending"])
-    ).count()
+    open_tickets = Ticket.query.filter(Ticket.status.in_(TICKET_OPEN_STATUSES)).count()
     resolved = Ticket.query.filter_by(status="resolved").count()
     closed = Ticket.query.filter_by(status="closed").count()
 
     by_priority = {}
-    for priority in ["low", "medium", "high", "critical"]:
+    for priority in TICKET_PRIORITIES:
         by_priority[priority] = Ticket.query.filter_by(priority=priority).count()
 
     by_status = {}
-    for status in ["new", "assigned", "in_progress", "pending", "resolved", "closed"]:
+    for status in TICKET_STATUSES:
         by_status[status] = Ticket.query.filter_by(status=status).count()
 
     by_category = {}
@@ -196,7 +217,7 @@ def get_agent_performance():
 
 def calculate_sla_compliance():
     resolved_tickets = Ticket.query.filter(
-        Ticket.status.in_(["resolved", "closed"]), Ticket.resolved_at.isnot(None)
+        Ticket.status.in_(TICKET_CLOSED_STATUSES), Ticket.resolved_at.isnot(None)
     ).all()
 
     if not resolved_tickets:

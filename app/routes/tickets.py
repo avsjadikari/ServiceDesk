@@ -28,7 +28,7 @@ from app.utils import (
     generate_ticket_number,
     get_priority_color,
     get_status_color,
-    log_audit,
+    log_ticket_audit,
     validate_upload_sniff,
 )
 
@@ -173,7 +173,7 @@ def new():
         db.session.add(ticket)
         db.session.commit()
 
-        log_audit(current_user.id, "create", "ticket", ticket.id, ticket.id)
+        log_ticket_audit(ticket, "create")
 
         apply_automation_rules(ticket, "ticket_created")
 
@@ -238,7 +238,7 @@ def edit(ticket_id):
         _apply_form_to_ticket(ticket, form)
         db.session.commit()
 
-        log_audit(current_user.id, "update", "ticket", ticket.id, ticket.id)
+        log_ticket_audit(ticket, "update")
 
         flash(f"Ticket {ticket.ticket_number} updated successfully.", "success")
         return redirect(url_for("tickets.view", ticket_id=ticket.id))
@@ -267,12 +267,9 @@ def update_status(ticket_id):
 
     db.session.commit()
 
-    log_audit(
-        current_user.id,
+    log_ticket_audit(
+        ticket,
         "status_change",
-        "ticket",
-        ticket.id,
-        ticket.id,
         {"old_status": old_status, "new_status": new_status},
     )
 
@@ -316,14 +313,7 @@ def assign(ticket_id):
         ticket.promote_status_if_new()
         db.session.commit()
 
-        log_audit(
-            current_user.id,
-            "assign",
-            "ticket",
-            ticket.id,
-            ticket.id,
-            {"assigned_to": assignee_id},
-        )
+        log_ticket_audit(ticket, "assign", {"assigned_to": assignee_id})
 
         from app.email_utils import send_ticket_assigned
 
@@ -356,7 +346,7 @@ def add_comment(ticket_id):
         db.session.add(comment)
         db.session.commit()
 
-        log_audit(current_user.id, "comment", "ticket", ticket.id, ticket.id)
+        log_ticket_audit(ticket, "comment")
 
         from app.email_utils import send_ticket_comment
 
@@ -384,14 +374,7 @@ def link_asset(ticket_id):
         ticket.asset_id = asset_id
         db.session.commit()
 
-        log_audit(
-            current_user.id,
-            "link_asset",
-            "ticket",
-            ticket.id,
-            ticket.id,
-            {"asset_id": asset_id},
-        )
+        log_ticket_audit(ticket, "link_asset", {"asset_id": asset_id})
 
         flash("Asset linked successfully.", "success")
 
@@ -512,12 +495,9 @@ def _store_attachment(ticket, upload, safe_name, unique_name):
     db.session.add(attachment)
     db.session.commit()
 
-    log_audit(
-        current_user.id,
+    log_ticket_audit(
+        ticket,
         "upload_attachment",
-        "ticket",
-        ticket.id,
-        ticket.id,
         {"filename": safe_name, "size": file_size},
     )
     return True
@@ -542,12 +522,9 @@ def download_attachment(attachment_id):
     if not os.path.isfile(file_path):
         abort(404)
 
-    log_audit(
-        current_user.id,
+    log_ticket_audit(
+        ticket,
         "download_attachment",
-        "ticket",
-        ticket.id,
-        ticket.id,
         {"filename": attachment.filename},
     )
     return send_file(
