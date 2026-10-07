@@ -19,22 +19,50 @@ deployment topology changes.
 
 Target: **~50 employees**, a handful of concurrent agents.
 
-- Headroom is large: the app is a single sync Flask process; Postgres is the
-  only stateful dependency. At this scale the bottleneck is never request
-  throughput — it is an unreturned call *inside* a request (SMTP, external
-  lookup) tying up a worker.
-- Mitigations already in place:
-  - `MAIL_TIMEOUT` (default 10s) caps SMTP hangs; sends are async-able
-    (`MAIL_ASYNC`).
-  - `MAX_CONTENT_LENGTH` enforced in-app (not just at the proxy) → uploads
-    capped, oversized requests get a friendly 413, not a hung upload.
-  - Rate limits (`default_limits` on `limiter` in `app/__init__.py`) bound
-    per-IP abuse.
-- **Scale trigger:** split-boundary pressure (failures/latency at >200
-  concurrent agents, or rate-limit storage contention) → move rate-limit
-  storage to Redis (`RATELIMIT_STORAGE_URI`), then consider gunicorn workers
-  per core. No circuit breakers/bulkheads until a second outbound dependency
-  exists (sole dependency is the DB; that is Postgres's job).
+**Estimate (back-of-envelope, Phase 8):**
+- QPS: 50 users × 30 actions/day ÷ 86 400 s ≈ **0.02 req/s avg**, ~0.1 at 5×
+  peak. Measured single-instance throughput (below) is ~2 600 req/s — 4 to 5
+  orders of magnitude of headroom. No caching needed at this volume (row 5 of
+  the diagnostic).
+- Storage: ~5 KB per recorded action × ~1 500 actions/day ≈ **7.5 MB/day,
+  ~2.7 GB/yr** — trivial for Postgres. Attachments go to disk, not the DB.
+
+**Concurrency / backpressure:**
+- The app is a single sync Flask process (gunicorn `gthread`,
+  `GUNICORN_WORKERS` default 3-4 × `GUNICORN_THREADS` 2 → **6-8 concurrent
+  requests**). Gunicorn's socket backlog (default 2048) overflow-queues the
+  rest; combined with the rate limiter, in-flight work is bounded.
+- SLA/automation/audit work happens inside the request. Long SMTP sends are
+  capped by `MAIL_TIMEOUT` and can be pushed to a daemon thread
+  (`MAIL_ASYNC`); that is the only async path that exists on purpose.
+- **Scale trigger:** sustained latency regression while worker CPU is low
+  (i.e. requests waiting, not computing) → raise `GUNICORN_WORKERS`/`THREADS`
+  first; move rate-limit storage to Redis (`RATELIMIT_STORAGE_URI`) if limiter
+  lock contention appears; add a second web container only past that.
+
+**Database pool:**
+- SQLAlchemy defaults: `pool_size=5`, `max_overflow=10` per worker process.
+  3-4 gunicorn workers → up to **~20 idle, ~60 worst-case Postgres
+  connections**, under the default `max_connections=100`. Leave defaults;
+  raise `pool_size` only with the worker count.
+- `pool_pre_ping` + `pool_recycle` already handle stale connections.
+
+**Rate limiter (login path audit, Phase 8):**
+- Auth routes carry dedicated per-IP limits — `login` 5/min, `login_2fa`
+  10/min, `forgot_password` 3/min — layered over the global
+  `200/day`/`50/hour` defaults. Distributed brute-force (IP rotation) is
+  stopped by the in-app account lockout (`LOGIN_MAX_ATTEMPTS`/lockout minutes)
+  per account. Combination is adequate at this deployment; revisit only if the
+  app is ever exposed to the public internet.
+
+**Availability (RPO/RTO):**
+- NFR baseline: **99.9% ~ 8.8 h/yr** — matches single-instance reality.
+- Single Postgres volume: RPO = last backup, RTO = restore + container
+  start (minutes). Minimum viable backup — a cron'd `pg_dump` to an off-host
+  location, hourly:
+  `0 * * * * docker exec $(docker compose ps -q db) pg_dump -U servicedesk servicedesk | gzip > /backups/servicedesk-$(date +\%F-\%H).sql.gz`
+  (Retention: keep 48 h hourly + daily; verify restorability quarterly by
+  restoring into a scratch container.)
 
 ## Load smoke
 
@@ -99,6 +127,28 @@ Current surface (deemed sufficient at this scale):
 
 Deferred: structured telemetry (OpenTelemetry/prometheus) — add when there is
 a second service to correlate with, not before.
+
+## Phase 8 (system-design) diagnostic — 8 rows
+
+1. **Requirements** — listed: functional (tickets, SLA, assets, KB, analytics,
+   portal) + NFR (50 users, <1 s p95, 99.9%, 8.8 h/yr).
+2. **QPS/storage estimate** — real (above): ~0.02 avg / 0.1 peak req/s,
+   ~7.5 MB/day. Four to five orders of magnitude below measured capacity.
+3. **Redundancy** — single web + single Postgres by scope. Honest position:
+   no multi-AZ at 50 users; failure budget covered by RPO/RTO above and
+   health-gated rollback. Add replicas only when downtime per year > 8.8 h.
+4. **DB scaling strategy** — vertical first; pool/workers sized (above;
+   ~60 conns max < 100 default); SQLite→Postgres migration path documented in
+   README. Shard only when single-node Postgres is the measured bottleneck.
+5. **Cache for read-heavy paths** — none, and none warranted at 0.02 req/s.
+   Introduce cache-aside (Redis) only when the slowest list view becomes a
+   measured problem.
+6. **Async via queues** — SMTP async path exists (daemon thread +
+   `MAIL_ASYNC`). No queue broker until email is not the only async job.
+7. **Monitoring/alerting** — `/health` + `/ready` probes, gunicorn access
+   logs, SMTP-failure hint logging. Telemetry deferred (documented).
+8. **Deployment strategy** — image swap + append-only migrations; rollback =
+   old image pinned at old schema; health gates after deploy. Documented above.
 
 ## Phase 7 (release-it) diagnostic — 8 rows
 

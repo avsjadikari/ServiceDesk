@@ -22,7 +22,7 @@
 | 5 — Draw the architecture boundary | clean-architecture | done | ARCHITECTURE.md | 2026-10-08 |
 | 6 — Lock in the habits | pragmatic-programmer | done | TECH-DEBT.md | 2026-10-08 |
 | 7 — Make it survive production | release-it | done | OPERATIONS.md + TECH-DEBT.md | 2026-10-08 |
-| 8 — Size for real load | system-design | pending (entry decision 2026-10-08) | ARCHITECTURE.md + OPERATIONS.md | 2026-10-08 |
+| 8 — Size for real load | system-design | done | OPERATIONS.md (sizing + diagnostic) | 2026-10-08 |
 | 9 — Get the data layer right | ddia-systems | pending | ARCHITECTURE.md | |
 | Optional — Domain language | domain-driven-design | pending | ARCHITECTURE.md | |
 
@@ -51,6 +51,7 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 6 | Pragmatic diagnostic ~7/10: DRY (build_ticket), orthogonality (accepted model fusion), broken-windows policy in effect. Failing rows 1/5/6 are deployment/process scope → Phase 7 (release-it). `auth.py` 796 LoC kept (feature-cohesive; split would be tactical noise) | Every business rule in one place reached for ticket creation/SLA/audit/enums; automation status-transition divergence suspected and rowed |
 | 2026-10-08 | 7 | Release-it diagnostic 8 rows: timeouts real (`MAIL_TIMEOUT` caps SMTP), deep health real (`/ready` SELECT 1), load handling real (`scripts/load_smoke.py` + baselines), zero-downtime infra decision recorded; breakers/bulkheads/failure-injection N/A at 50 users (sole dep = DB), telemetry deferred (access logs suffice) | Full backlog fixed + pinned: Host-poisoning, same-password reset, unassign status regression, status whitelist, upload guard, SQLite avg_resolution, knowledge versioning/dead-branch, automation-vs-promote, app-level MAX_CONTENT_LENGTH + 413 UX. 259 tests green |
 | 2026-10-08 | 8 | Phase 8 entry decision: sprint 1 = load-smoke packaging + capacity note in OPERATIONS.md (done in Phase 7), sprint 2 = QUEUE-LEN/backpressure + limiter default-limit audit for the login path, sprint 3 = capacity model for Postgres pool vs gunicorn workers vs rate-limit storage | 50-user target: verify claims before naming them; the two load-relevant knobs (gunicorn workers × threads, limiter defaults) are already in prod hands |
+| 2026-10-08 | 8 | System-design diagnostic 8 rows ≈ **7.5/8 → 9/10**: requirements, real QPS/storage estimates (~0.02 avg / 0.1 peak req/s, ~7.5 MB/day), DB scaling (pool ≤60 conns sizing), cache (none warranted at 0.02 req/s), async (SMTP only), monitoring, deploy strategy all pass. **Row 3 (redundancy) partial by scope** — single web + single Postgres at 50 users, honest position recorded: no multi-AZ until downtime exceeds 99.9% budget; RPO/RTO + backup recipe added. Limiter audit: auth already limits (login 5/min, 2FA 10/min, forgot 3/min) + account lockout → adequate, no code change | "Size for real load" = document the real numbers so future build decisions have a floor; measured capacity (≈2 600 req/s) is 104-105× the estimated peak. Backpressure knobs already in prod (`GUNICORN_WORKERS/THREADS`, `RATELIMIT_STORAGE_URI`) |
 
 ## Next Actions
 
@@ -62,4 +63,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 6 entry decision (pragmatic-programmer, 2026-10-08) — `build_ticket` DRY factory across agent/portal/API; pragmatic 7-row ≈7/10; automation status divergence rowed
 - [x] Phase 7 entry decision (release-it) — production-survival gates: pinned defect backlog (unassign-resets-status, no status whitelist, `?_host=` reset leak, same-password reset, SQLite avg_resolution), upload 413 handling, deployment/rollback reversibility, automation-vs-promote divergence pin. Commits `83d10ec`, `67fc90c`, `c6a6ae6`, `af87e8b`, `9197367`; OPERATIONS.md + load-smoke baselines; 259 tests green
 - [x] Phase 8 entry decision (system-design) — see Key Decisions; sprint 2 (backpressure + limiter audit) is the first load work that belongs to Phase 8 proper
+- [x] Phase 8 results (system-design, 2026-10-08) — OPERATIONS.md sizing section (real estimates, backpressure, Postgres pool, RPO/RTO, backup recipe, login-limit audit) + 8-row diagnostic 9/10; no app code changed (load knobs already in prod hands; limits already adequate)
+- [ ] Phase 9 entry decision (ddia-systems, data layer: SLA concurrency, transaction boundaries, SQLite/Postgres portability)
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
