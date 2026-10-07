@@ -21,8 +21,8 @@
 | 4 — Reduce complexity | software-design-philosophy | done | TECH-DEBT.md | 2026-10-08 |
 | 5 — Draw the architecture boundary | clean-architecture | done | ARCHITECTURE.md | 2026-10-08 |
 | 6 — Lock in the habits | pragmatic-programmer | done | TECH-DEBT.md | 2026-10-08 |
-| 7 — Make it survive production | release-it | pending | RELIABILITY.md | |
-| 8 — Size for real load | system-design | pending | ARCHITECTURE.md + RELIABILITY.md | |
+| 7 — Make it survive production | release-it | done | OPERATIONS.md + TECH-DEBT.md | 2026-10-08 |
+| 8 — Size for real load | system-design | pending (entry decision 2026-10-08) | ARCHITECTURE.md + OPERATIONS.md | 2026-10-08 |
 | 9 — Get the data layer right | ddia-systems | pending | ARCHITECTURE.md | |
 | Optional — Domain language | domain-driven-design | pending | ARCHITECTURE.md | |
 
@@ -49,6 +49,8 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 5 | ARCHITECTURE.md: 3/7 diagnostic → boundary policy = **partial**, no four-ring rewrite (5.9 kLoC, 1 dev, low volatility). Pure-core extraction for high-risk math (SLA) adopted | Full de-correlation rejected on cost/volatility; options-bought vs not-bought documented |
 | 2026-10-08 | 5 | `calculate_sla_deadline` made domain-pure (injectable `sla_config` + `now`); +2 pure tests | Removes `current_app` leakage at the domain edge; unit-testable without DB |
 | 2026-10-08 | 6 | Pragmatic diagnostic ~7/10: DRY (build_ticket), orthogonality (accepted model fusion), broken-windows policy in effect. Failing rows 1/5/6 are deployment/process scope → Phase 7 (release-it). `auth.py` 796 LoC kept (feature-cohesive; split would be tactical noise) | Every business rule in one place reached for ticket creation/SLA/audit/enums; automation status-transition divergence suspected and rowed |
+| 2026-10-08 | 7 | Release-it diagnostic 8 rows: timeouts real (`MAIL_TIMEOUT` caps SMTP), deep health real (`/ready` SELECT 1), load handling real (`scripts/load_smoke.py` + baselines), zero-downtime infra decision recorded; breakers/bulkheads/failure-injection N/A at 50 users (sole dep = DB), telemetry deferred (access logs suffice) | Full backlog fixed + pinned: Host-poisoning, same-password reset, unassign status regression, status whitelist, upload guard, SQLite avg_resolution, knowledge versioning/dead-branch, automation-vs-promote, app-level MAX_CONTENT_LENGTH + 413 UX. 259 tests green |
+| 2026-10-08 | 8 | Phase 8 entry decision: sprint 1 = load-smoke packaging + capacity note in OPERATIONS.md (done in Phase 7), sprint 2 = QUEUE-LEN/backpressure + limiter default-limit audit for the login path, sprint 3 = capacity model for Postgres pool vs gunicorn workers vs rate-limit storage | 50-user target: verify claims before naming them; the two load-relevant knobs (gunicorn workers × threads, limiter defaults) are already in prod hands |
 
 ## Next Actions
 
@@ -58,5 +60,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 4 entry decision (software-design-philosophy, 2026-10-08) — audit mapping centralized, enum-driven utils, module contracts stated; 8/10; settled the deferral of utils/auth size to Phase 5
 - [x] Phase 5 entry decision (clean-architecture, 2026-10-08) — ARCHITECTURE.md written; boundary policy: partial, pure-core extraction for SLA; Slack-friendly debt map (controller orchestration, entity/persistence fusion, `__init__` coil)
 - [x] Phase 6 entry decision (pragmatic-programmer, 2026-10-08) — `build_ticket` DRY factory across agent/portal/API; pragmatic 7-row ≈7/10; automation status divergence rowed
-- [ ] Phase 7 entry decision (release-it) — production-survival gates: pinned defect backlog (unassign-resets-status, no status whitelist, `?_host=` reset leak, same-password reset, SQLite avg_resolution), upload 413 handling, deployment/rollback reversibility, automation-vs-promote divergence pin
+- [x] Phase 7 entry decision (release-it) — production-survival gates: pinned defect backlog (unassign-resets-status, no status whitelist, `?_host=` reset leak, same-password reset, SQLite avg_resolution), upload 413 handling, deployment/rollback reversibility, automation-vs-promote divergence pin. Commits `83d10ec`, `67fc90c`, `c6a6ae6`, `af87e8b`, `9197367`; OPERATIONS.md + load-smoke baselines; 259 tests green
+- [x] Phase 8 entry decision (system-design) — see Key Decisions; sprint 2 (backpressure + limiter audit) is the first load work that belongs to Phase 8 proper
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
