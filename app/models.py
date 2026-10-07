@@ -172,8 +172,8 @@ class Ticket(db.Model):
         return False
 
     def promote_status_if_new(self):
-        """Promoting a brand-new ticket marks it assigned; later statuses keep theirs."""
-        if self.status == "new":
+        """Promoting a not-yet-assigned ticket marks it assigned; later statuses keep theirs."""
+        if self.status in (None, "new"):
             self.status = "assigned"
 
     @property

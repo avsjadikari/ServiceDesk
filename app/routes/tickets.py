@@ -19,6 +19,7 @@ from sqlalchemy.orm import joinedload
 from werkzeug.utils import secure_filename
 
 from app import db
+from app.enums import TICKET_STATUSES
 from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
 from app.models import Attachment, Comment, Ticket, User
 from app.utils import (
@@ -113,12 +114,10 @@ def board():
         abort(403)
 
     tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    # Board shows every status except "closed".
     columns = {
-        "new": [t for t in tickets if t.status == "new"],
-        "assigned": [t for t in tickets if t.status == "assigned"],
-        "in_progress": [t for t in tickets if t.status == "in_progress"],
-        "pending": [t for t in tickets if t.status == "pending"],
-        "resolved": [t for t in tickets if t.status == "resolved"],
+        status: [t for t in tickets if t.status == status]
+        for status in TICKET_STATUSES[:-1]
     }
     return render_template(
         "tickets/board.html",
