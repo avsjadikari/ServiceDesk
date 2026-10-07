@@ -16,7 +16,7 @@
 | Phase | Skill | Status | Artifact | Date |
 |---|---|---|---|---|
 | 1 — Build the safety net | working-with-legacy-code | done | TESTING.md + TECH-DEBT.md (GATE) | 2026-10-08 |
-| 2 — Make the code readable | clean-code | in-progress | TECH-DEBT.md | |
+| 2 — Make the code readable | clean-code | done | TECH-DEBT.md | 2026-10-08 |
 | 3 — Apply named refactorings | refactoring-patterns | pending | TECH-DEBT.md | |
 | 4 — Reduce complexity | software-design-philosophy | pending | TECH-DEBT.md | |
 | 5 — Draw the architecture boundary | clean-architecture | pending | ARCHITECTURE.md | |
@@ -39,9 +39,13 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 1 | Phase 1 scope: all four modules (tickets, auth, analytics, knowledge+portal KB) | User choice at intake |
 | 2026-10-08 | 1 | Bug policy: pin wrong behavior + Debt Ledger, never silently fix | User accepted; callers may depend on quirks |
 | 2026-10-08 | 1 | Result: 252 tests green, coverage 71%→83%; target modules 99-100% | 13 bugs ledgered |
+| 2026-10-08 | 2 | tickets.py audit ~6.7/10 → apply fixes 1-5 + int()/email behavior fixes now | Clear wins; user approved |
+| 2026-10-08 | 2 | Conventions: `_agent_users()`, guard clauses, `_to_int()`/`type=int`, no `pass`-dead branches, `_notify()` email guard; enums via `app/enums.py` tuples in new code | Reuse/applied; enum migration = Phase 3 |
+| 2026-10-08 | 2 | No CI gate now (structure+behavior commits kept separate) | Manual discipline still viable at 1 dev |
 
 ## Next Actions
 
 - [x] Phase 1 entry decision (agent + user, 2026-10-08)
-- [ ] Phase 2 entry decision (clean-code)
+- [x] Phase 2 entry decision (clean-code, 2026-10-08)
+- [ ] Phase 3 entry decision (refactoring-patterns) — commit: apply Smell Inventory rows (status-promote helper, enum references), then revisit Name/Function/Comment class gaps
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
