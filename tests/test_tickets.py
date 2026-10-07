@@ -1337,6 +1337,61 @@ class TestAttachmentBranches:
             assert Attachment.query.filter_by(ticket_id=ticket.id).count() == 0
 
 
+class TestLargeRequestHandling:
+    """RequestEntityTooLarge → friendly redirect/flash or JSON 413."""
+
+    def test_oversize_upload_redirects_with_flash(self, client, app, db, admin_user):
+        with app.app_context():
+            app.config["MAX_CONTENT_LENGTH"] = 1024
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+            ticket = Ticket(
+                ticket_number="TKT-310001",
+                title="Big upload",
+                description="d",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            bulk = b"x" * 4096
+            raw = (
+                b"--boundary\r\n"
+                b'Content-Disposition: form-data; name="file"; filename="big.bin"\r\n'
+                b"Content-Type: application/octet-stream\r\n\r\n"
+                + bulk
+                + b"\r\n--boundary--\r\n"
+            )
+            response = client.post(
+                f"/tickets/{ticket.id}/attachments",
+                data=raw,
+                content_type="multipart/form-data; boundary=boundary",
+                headers={"Referer": f"http://localhost/tickets/{ticket.id}"},
+            )
+            assert response.status_code == 302
+            assert f"/tickets/{ticket.id}" in response.headers["Location"]
+            page = client.get(f"/tickets/{ticket.id}")
+            assert page.status_code == 200
+            assert b"too large" in page.data.lower()
+
+    def test_oversize_api_body_returns_json_413(self, client, app, admin_user):
+        with app.app_context():
+            app.config["MAX_CONTENT_LENGTH"] = 1024
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+            response = client.post(
+                "/api/tickets",
+                json={"title": "y" * 2048, "description": "d"},
+            )
+            assert response.status_code == 413
+            assert response.get_json()["error"]
+
+
 class TestDownloadBranches:
     """Characterize /attachments/<id> (download_attachment:492,498-501,503)."""
 
