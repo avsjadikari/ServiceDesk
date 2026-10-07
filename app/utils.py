@@ -25,12 +25,19 @@ def generate_ticket_number():
     return f"TKT-{new_num:06d}"
 
 
-def calculate_sla_deadline(priority):
-    sla_config = current_app.config.get("SLA_CONFIG", {})
+def calculate_sla_deadline(priority, sla_config=None, now=None):
+    """SLA deadline for a priority. Domain-pure: pass sla_config + now to
+    test without app context; defaults read the Flask config."""
+    sla_config = (
+        sla_config
+        if sla_config is not None
+        else current_app.config.get("SLA_CONFIG", {})
+    )
+    now = now or datetime.utcnow()
     if priority in sla_config:
         hours = sla_config[priority]["resolution_hours"]
-        return datetime.utcnow() + timedelta(hours=hours)
-    return datetime.utcnow() + timedelta(hours=24)
+        return now + timedelta(hours=hours)
+    return now + timedelta(hours=24)
 
 
 def _client_ip():

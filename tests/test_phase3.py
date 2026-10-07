@@ -158,6 +158,25 @@ class TestPagination:
         assert 'class="pagination' in resp.get_data(as_text=True)
 
 
+class TestSlaDeadlinePure:
+    """SLA deadline is domain-pure: injectable config + clock, no app context."""
+
+    def test_default_24h_when_priority_unknown(self):
+        from datetime import datetime, timedelta
+
+        now = datetime(2026, 10, 8, 12, 0, 0)
+        deadline = calculate_sla_deadline("urgent", sla_config={}, now=now)
+        assert deadline == now + timedelta(hours=24)
+
+    def test_uses_configured_priority_hours(self):
+        from datetime import datetime, timedelta
+
+        now = datetime(2026, 10, 8, 12, 0, 0)
+        cfg = {"critical": {"resolution_hours": 4}}
+        deadline = calculate_sla_deadline("critical", sla_config=cfg, now=now)
+        assert deadline == now + timedelta(hours=4)
+
+
 class TestMagicBytes:
     def test_validate_upload_sniff(self):
         png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16

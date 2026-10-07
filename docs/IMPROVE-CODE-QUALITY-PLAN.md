@@ -19,7 +19,7 @@
 | 2 — Make the code readable | clean-code | done | TECH-DEBT.md | 2026-10-08 |
 | 3 — Apply named refactorings | refactoring-patterns | done | TECH-DEBT.md | 2026-10-08 |
 | 4 — Reduce complexity | software-design-philosophy | done | TECH-DEBT.md | 2026-10-08 |
-| 5 — Draw the architecture boundary | clean-architecture | pending | ARCHITECTURE.md | |
+| 5 — Draw the architecture boundary | clean-architecture | done | ARCHITECTURE.md | 2026-10-08 |
 | 6 — Lock in the habits | pragmatic-programmer | pending | TECH-DEBT.md | |
 | 7 — Make it survive production | release-it | pending | RELIABILITY.md | |
 | 8 — Size for real load | system-design | pending | ARCHITECTURE.md + RELIABILITY.md | |
@@ -46,6 +46,8 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 3 | Phase 3 does NOT change behavior: defect fixes stay pinned+ledgered (unassign-resets-status, status whitelist) — those surface in Phase 6/7 hardening | Preserved φ arrow: structural change never mixed with behavioral change |
 | 2026-10-08 | 4 | Philosophy-of-software-design audit (ticket core): ~5.5 → 8/10. Applied: info-hiding of ticket audit mapping (`log_ticket_audit`), enum-driven metrics/colors, module-header contract for `utils.py` | Diagnostic rows 1-4,6,8 now pass; residual: `utils.py` grab-bag split + `auth.py` 796-line module size belong to Phase 5 (boundaries) |
 | 2026-10-08 | 4 | Module depth verdicts: `email_utils` (SMTP+async queue) deep ✓; `models.py` owns DB constraints ✓; `__init__.py` wiring coil — revisit after Phase 5 map | Depth over size: judged by interface-vs-implementation, not line count |
+| 2026-10-08 | 5 | ARCHITECTURE.md: 3/7 diagnostic → boundary policy = **partial**, no four-ring rewrite (5.9 kLoC, 1 dev, low volatility). Pure-core extraction for high-risk math (SLA) adopted | Full de-correlation rejected on cost/volatility; options-bought vs not-bought documented |
+| 2026-10-08 | 5 | `calculate_sla_deadline` made domain-pure (injectable `sla_config` + `now`); +2 pure tests | Removes `current_app` leakage at the domain edge; unit-testable without DB |
 
 ## Next Actions
 
@@ -53,5 +55,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 2 entry decision (clean-code, 2026-10-08)
 - [x] Phase 3 entry decision (refactoring-patterns, 2026-10-08) — status-promote helper, enum constants, route decomposition, SNIFF_LENGTH, corrected docstring; 3 commits, 254 tests green each step
 - [x] Phase 4 entry decision (software-design-philosophy, 2026-10-08) — audit mapping centralized, enum-driven utils, module contracts stated; 8/10; settled the deferral of utils/auth size to Phase 5
-- [ ] Phase 5 entry decision (clean-architecture) — produce ARCHITECTURE.md: draw module boundaries & dependency direction across app/ (routes ↔ models ↔ utils ↔ email/security/settings); target `utils.py` grab-bag split + `__init__.py` coil
+- [x] Phase 5 entry decision (clean-architecture, 2026-10-08) — ARCHITECTURE.md written; boundary policy: partial, pure-core extraction for SLA; Slack-friendly debt map (controller orchestration, entity/persistence fusion, `__init__` coil)
+- [ ] Phase 6 entry decision (pragmatic-programmer) — habits + build/portable patterns; trim `routes/auth.py` (796 LoC) and portal/API copies of ticket-creation logic (portal.py:93 & api.py:92 each re-implement `calculate_sla_deadline` wiring) — Rule of Three now at 3 call sites for a `_create_ticket`-style helper
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
