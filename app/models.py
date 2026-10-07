@@ -3,7 +3,12 @@ from flask_login import UserMixin
 from sqlalchemy import CheckConstraint
 from werkzeug.security import generate_password_hash, check_password_hash
 from app import db
-from app.enums import TICKET_PRIORITIES, TICKET_STATUSES, TICKET_TYPES
+from app.enums import (
+    TICKET_CLOSED_STATUSES,
+    TICKET_PRIORITIES,
+    TICKET_STATUSES,
+    TICKET_TYPES,
+)
 
 
 class User(UserMixin, db.Model):
@@ -131,9 +136,9 @@ class Ticket(db.Model):
     ticket_number = db.Column(db.String(20), unique=True, nullable=False, index=True)
     title = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    type = db.Column(db.String(20), default="incident")
-    status = db.Column(db.String(20), default="new", index=True)
-    priority = db.Column(db.String(20), default="medium", index=True)
+    type = db.Column(db.String(20), default=TICKET_TYPES[0])
+    status = db.Column(db.String(20), default=TICKET_STATUSES[0], index=True)
+    priority = db.Column(db.String(20), default=TICKET_PRIORITIES[1], index=True)
     category = db.Column(db.String(64), index=True)
 
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
@@ -162,9 +167,14 @@ class Ticket(db.Model):
     @property
     def is_sla_breached(self):
         if self.sla_deadline and datetime.utcnow() > self.sla_deadline:
-            if self.status not in ["resolved", "closed"]:
+            if self.status not in TICKET_CLOSED_STATUSES:
                 return True
         return False
+
+    def promote_status_if_new(self):
+        """Promoting a brand-new ticket marks it assigned; later statuses keep theirs."""
+        if self.status == "new":
+            self.status = "assigned"
 
     @property
     def response_time(self):
