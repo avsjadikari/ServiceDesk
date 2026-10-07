@@ -997,6 +997,50 @@ class TestCommentAuthz:
             assert Comment.query.filter_by(ticket_id=ticket.id).count() == 0
 
 
+class TestAutomationAssign:
+    """Characterize automation assign semantics (utils._execute_automation_rule)."""
+
+    def test_automation_assign_resets_in_progress_to_assigned(
+        self, client, app, db, admin_user, agent_user
+    ):
+        # CHARACTERIZED → fixed 2026-10-08: automation assign reuses
+        # Ticket.promote_status_if_new() — an in_progress ticket keeps its
+        # workflow state; only None/"new" tickets move to "assigned" (was:
+        # unconditional reset to "assigned")
+        from app.models import AutomationRule
+        from app.utils import _execute_automation_rule
+
+        with app.app_context():
+            rule = AutomationRule(
+                name="auto-assign",
+                trigger_type="ticket_created",
+                action_type="assign",
+                action_config={"assign_to": agent_user.id},
+                is_active=True,
+                priority=10,
+            )
+            db.session.add(rule)
+            db.session.commit()
+
+            ticket = Ticket(
+                ticket_number="TKT-300001",
+                title="Automation target",
+                description="d",
+                created_by=admin_user.id,
+                status="in_progress",
+                assigned_to=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            _execute_automation_rule(ticket, rule)
+            assert ticket.status == "in_progress"
+            assert ticket.assigned_to == agent_user.id
+
+
 class TestLinkAsset:
     """Characterize /tickets/<id>/link-asset (link_asset:344-365)."""
 

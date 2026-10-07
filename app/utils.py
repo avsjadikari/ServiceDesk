@@ -159,7 +159,7 @@ def _execute_automation_rule(ticket, rule):
             assignee = User.query.get(assignee_id)
             if assignee:
                 ticket.assigned_to = assignee_id
-                ticket.status = "assigned"
+                ticket.promote_status_if_new()
                 db.session.commit()
 
     elif rule.action_type == "notify":
