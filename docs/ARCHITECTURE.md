@@ -1,6 +1,6 @@
 # ServiceDesk Architecture
 
-Status: **2026-10-08** — Phase 5 (clean-architecture) + Phase 9 (ddia-systems) audits. Live doc; update with boundary changes.
+Status: **2026-10-08** — Phase 5 (clean-architecture) + 9 (ddia) + 10 (domain language) audits. Live doc; update with boundary changes.
 
 ## Context
 
@@ -162,9 +162,105 @@ contention point.
 **Score ~8/10** (6/7 rows). Gap to 10/10: run the quarterly restore
 verification (OPERATIONS.md) and record it here.
 
+## Domain Language (DDD audit, Phase 10)
+
+Cost-benefit: full DDD (repositories, events, aggregates-as-objects) stays
+rejected at 5.9 kLoC/1 dev. What *is* worth doing here is naming + boundary
+discipline — the codebase largely speaks it already; this doc makes it
+explicit and single-source.
+
+### Ubiquitous language (single source: `app/enums.py` + model fields)
+
+| Term | Meaning | Where enforced |
+|---|---|---|
+| ticket | Work item; typed `incident` / `request` / `problem` | CheckConstraint `ck_tickets_type` |
+| status | `new` → `assigned` → `in_progress` → `pending` / `resolved` / `closed` | `ck_tickets_status`; transitions via `promote_status_if_new` |
+| priority | `low` / `medium` / `high` / `critical` | `ck_tickets_priority` |
+| SLA deadline / breach | `sla_deadline` set at creation from priority; `is_sla_breached` computed live | pure `calculate_sla_deadline`; `Ticket.is_sla_breached` |
+| response / resolution time | hours from creation to `first_response_at` / `resolved_at` | `Ticket.response_time` / `resolved_time` properties |
+| annotation (comments) | public or internal (`is_internal`) | `Comment.is_internal` |
+| assignee / submitter (reporting user) | `assigned_to` / `created_by` | FK columns |
+| asset | inventoried item, one of `active/maintenance/retired/available`; tickets link by `asset_id` | `ck_assets_status` |
+| article / version | knowledge item + immutable snapshot history | `ArticleVersion` cascade |
+| automation rule | trigger type + conditions → action type + config | `apply_automation_rules`, `_execute_automation_rule` |
+| audit trail | append-only record of actions | `log_audit` / `log_ticket_audit` (single mapping in one helper) |
+| account status | `disabled` / `locked` / `active` | `User.account_status` |
+
+UI copy may use casual ("report your issue") — never in model/API names.
+No second term for "ticket" exists in code (`issue` appears only as seed
+knowledge content and placeholder text).
+
+### Bounded contexts (context map)
+
+One monolith, deliberately **one model** — contexts are linguistic/model
+boundaries, not deployment units:
+
+```
+ Identity&Access ──┐        ┌── Knowledge
+ (User, 2FA, lock) │        │   (Article, ArticleVersion)
+                   ▼        ▼
+              ┌─────────────────────┐
+   Portal ───►│  TICKETING  (Core)  │──► Assets (by asset_id only)
+   (same      │ Ticket, Comment,    │        (Asset, ticket linkage)
+    model,    │ Attachment,         │
+    conformer)│ AutomationRule, SLA│
+              └─────────────────────┘
+                   │
+                   ▼
+              Compliance/Audit (AuditLog — write-only)
+```
+
+- **Ticketing (Core)** — the rules: status machine, SLA math, automation,
+  assignment. Everything else refers to it; it refers to nothing but
+  `Identity&Access`.
+- **Portal / API** are *conformist* consumers of the same Ticketing model —
+  no separate Customer type; the self-service surface is enforced by route
+  guards, not a second domain model. Upgrade path: split a `CustomerContext`
+  only if portal lifecycle diverges (needs own statuses/history).
+- **Assets** integrate by FK only (`asset_id`); asset vocabulary never leaks
+  into ticket code beyond the link.
+- **Compliance/Audit** consumes facts, mutates nothing; its `action` strings
+  are the ubiquitous verbs (create / update_status / assign / resolve …).
+- No external third-party domain crosses a boundary → **no
+  Anti-Corruption Layer needed today**. If an inventory system or ITSM
+  connector is ever added, translate at the edge (that is the seam).
+
+### Strategic design (where to invest)
+
+- **Core Domain: the ticket lifecycle** — status machine, SLA deadline math,
+  automation engine, audit-of-transitions. Highest-risk (data loss / wrong
+  SLA) and already the deepest-modelled code (pure SLA fn, entity rules,
+  check constraints, the pinned tests). Investment stays here.
+- **Supporting:** knowledge base, asset inventory, portal, analytics —
+  build, don't over-engineer (analytics computed-on-read; versioning via
+  snapshots).
+- **Generic:** auth/2FA, SMTP, i18n, rate limiting, uploads — frameworky or
+  commodity; the app already leans on Flask ecosystem + stdlib, not custom.
+
+### Diagnostic (7 rows) + depth
+
+Rows: expert-readable names ✔ · contexts explicitly defined ✔ (this doc) ·
+small aggregates ✔ (Ticket root; comments/attachments/audit reference by FK;
+Article+versions cascade) · behavior in domain objects ✔ (status promotion,
+breach/response/resolution on `Ticket`; account status/lock on `User`) ·
+**domain events ✗** (automation reacts by trigger-type lookup, audit is a
+generic log — none named as past-tense facts) · ACL at every external
+integration ✔ (none exist; seam named) · core subdomain identified ✔.
+
+Depth: +1 core domain is genuinely rich (rule engine, pure SLA math, status
+machine — not CRUD) · +1 invariants live in aggregates/DB (check
+constraints + entity methods, not scattered services) · +1 ubiquitous
+language consistent across code, tests, and UI.
+
+**Score 9/10** (6/7 rows + 3). Gap to 10/10 = named domain events:
+`TicketStatusChanged`, `SlaBreached` — add only when automation branching
+grows or reaction needs to go async; the trigger-type lookup is the
+upgrade seam already.
+
 ## Change Log
 
 | Date | Change |
 |---|---|
 | 2026-10-08 | Initial map, 7-row diagnostic (3/7), boundary policy + debt map. `calculate_sla_deadline` made pure. |
 | 2026-10-08 | Data-layer DDIA audit: portability clean, isolation/races assessed, replication/derived-data decisions, 6/7 diagnostic. |
+| 2026-10-08 | Domain-language audit: context map, ubiquitous-language glossary, core-domain strategy, 9/10 diagnostic. |

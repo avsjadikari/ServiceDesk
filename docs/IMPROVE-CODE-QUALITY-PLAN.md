@@ -24,7 +24,7 @@
 | 7 — Make it survive production | release-it | done | OPERATIONS.md + TECH-DEBT.md | 2026-10-08 |
 | 8 — Size for real load | system-design | done | OPERATIONS.md (sizing + diagnostic) | 2026-10-08 |
 | 9 — Get the data layer right | ddia-systems | done | ARCHITECTURE.md (data-layer audit) | 2026-10-08 |
-| Optional — Domain language | domain-driven-design | pending | ARCHITECTURE.md | |
+| Optional — Domain language | domain-driven-design | done | ARCHITECTURE.md (domain-language audit) | 2026-10-08 |
 
 Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reason> · skipped: <reason>
 
@@ -65,5 +65,5 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 8 entry decision (system-design) — see Key Decisions; sprint 2 (backpressure + limiter audit) is the first load work that belongs to Phase 8 proper
 - [x] Phase 8 results (system-design, 2026-10-08) — OPERATIONS.md sizing section (real estimates, backpressure, Postgres pool, RPO/RTO, backup recipe, login-limit audit) + 8-row diagnostic 9/10; no app code changed (load knobs already in prod hands; limits already adequate)
 - [x] Phase 9 entry + results (ddia-systems, 2026-10-08) — data-layer audit in ARCHITECTURE.md: portability verified clean (ilike/JSON/time-source), isolation defaults known (PG Read Committed, SQLite single-writer), 4 check-then-set races accepted-with-upgrade-paths (ticket-number, login counter, automation double-fire, view/helpful counters), replication n/a by scope, derived-data separation confirmed. Diagnostic 6/7 (~8/10); gap = quarterly restore-verify (operator checklist). No code changed
-- [ ] Phase 10 entry decision (domain-driven-design, optional — bounded contexts/ubiquitous language worth it only if a second consumer appears)
+- [x] Phase 10 entry + results (domain-driven-design, optional, 2026-10-08) — domain-language audit in ARCHITECTURE.md: ubiquitous-language glossary (single-source enums, no ticket/issue split), 6 bounded contexts mapped (Ticketing core, Portal/API conformist, Assets FK-only, Audit write-only, Identity, Knowledge), strategic design (Core = ticket lifecycle; supporting = KB/assets/analytics; generic = auth/SMTP/i18n), no ACL needed (no external domain seam), diagnostic 6/7 rows + 3 depth = **9/10**; gap = named domain events (`TicketStatusChanged`/`SlaBreached`) — add only if automation branching grows or reactions go async. No code changed
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
