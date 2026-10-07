@@ -24,8 +24,7 @@ from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
 from app.models import Attachment, Comment, Ticket, User
 from app.utils import (
     apply_automation_rules,
-    calculate_sla_deadline,
-    generate_ticket_number,
+    build_ticket,
     get_priority_color,
     get_status_color,
     log_ticket_audit,
@@ -126,25 +125,6 @@ def board():
     )
 
 
-def _create_ticket(form, created_by_id):
-    ticket = Ticket(
-        ticket_number=generate_ticket_number(),
-        title=form.title.data,
-        description=form.description.data,
-        type=form.type.data,
-        priority=form.priority.data,
-        category=form.category.data,
-        created_by=created_by_id,
-        sla_deadline=calculate_sla_deadline(form.priority.data),
-    )
-
-    if form.assigned_to.data and form.assigned_to.data > 0:
-        ticket.assigned_to = form.assigned_to.data
-        ticket.promote_status_if_new()
-
-    return ticket
-
-
 def _apply_form_to_ticket(ticket, form):
     ticket.title = form.title.data
     ticket.description = form.description.data
@@ -169,7 +149,20 @@ def new():
     ]
 
     if form.validate_on_submit():
-        ticket = _create_ticket(form, current_user.id)
+        assigned_to = (
+            form.assigned_to.data
+            if form.assigned_to.data and form.assigned_to.data > 0
+            else None
+        )
+        ticket = build_ticket(
+            title=form.title.data,
+            description=form.description.data,
+            ticket_type=form.type.data,
+            priority=form.priority.data,
+            category=form.category.data,
+            created_by_id=current_user.id,
+            assigned_to=assigned_to,
+        )
         db.session.add(ticket)
         db.session.commit()
 

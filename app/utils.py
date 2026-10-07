@@ -25,6 +25,38 @@ def generate_ticket_number():
     return f"TKT-{new_num:06d}"
 
 
+def build_ticket(
+    title,
+    description,
+    ticket_type,
+    priority,
+    category,
+    created_by_id,
+    assigned_to=None,
+    sla_config=None,
+    now=None,
+):
+    """Construct an unsaved Ticket: auto-number, SLA deadline from priority,
+    and promote-to-assigned when an assignee is given. Shared by the agent,
+    portal, and API creation flows so the mapping lives in one place."""
+    ticket = Ticket(
+        ticket_number=generate_ticket_number(),
+        title=title,
+        description=description,
+        type=ticket_type,
+        priority=priority,
+        category=category,
+        created_by=created_by_id,
+        sla_deadline=calculate_sla_deadline(
+            priority, sla_config=sla_config, now=now
+        ),
+    )
+    if assigned_to:
+        ticket.assigned_to = assigned_to
+        ticket.promote_status_if_new()
+    return ticket
+
+
 def calculate_sla_deadline(priority, sla_config=None, now=None):
     """SLA deadline for a priority. Domain-pure: pass sla_config + now to
     test without app context; defaults read the Flask config."""

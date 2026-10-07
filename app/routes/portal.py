@@ -3,7 +3,7 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Ticket, Article, Comment
 from app.forms import TicketForm, CommentForm
-from app.utils import generate_ticket_number, calculate_sla_deadline
+from app.utils import build_ticket
 
 portal = Blueprint("portal", __name__)
 
@@ -82,16 +82,13 @@ def new_ticket():
     form.assigned_to.choices = [(0, "")]
 
     if form.validate_on_submit():
-        ticket = Ticket(
-            ticket_number=generate_ticket_number(),
+        ticket = build_ticket(
             title=form.title.data,
             description=form.description.data,
-            type=form.type.data,
+            ticket_type=form.type.data,
             priority=form.priority.data,
             category=form.category.data,
-            created_by=current_user.id,
-            sla_deadline=calculate_sla_deadline(form.priority.data),
-            status="new",
+            created_by_id=current_user.id,
         )
 
         db.session.add(ticket)

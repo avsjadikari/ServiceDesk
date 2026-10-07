@@ -8,6 +8,7 @@ from app.enums import (
 )
 from app.models import Ticket, Article, Asset, User
 from app.utils import (
+    build_ticket,
     get_ticket_metrics,
     calculate_sla_compliance,
     get_status_color,
@@ -61,8 +62,6 @@ def get_tickets():
 @login_required
 @limiter.limit("30 per hour")
 def create_ticket():
-    from app.utils import generate_ticket_number, calculate_sla_deadline
-
     data = request.get_json()
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
@@ -81,15 +80,13 @@ def create_ticket():
     if priority not in VALID_TICKET_PRIORITIES:
         return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(VALID_TICKET_PRIORITIES))}"}), 400
 
-    ticket = Ticket(
-        ticket_number=generate_ticket_number(),
+    ticket = build_ticket(
         title=title,
         description=(data.get("description") or "").strip(),
-        type=ticket_type,
+        ticket_type=ticket_type,
         priority=priority,
         category=(data.get("category") or "").strip() or None,
-        created_by=current_user.id,
-        sla_deadline=calculate_sla_deadline(priority),
+        created_by_id=current_user.id,
     )
 
     db.session.add(ticket)
