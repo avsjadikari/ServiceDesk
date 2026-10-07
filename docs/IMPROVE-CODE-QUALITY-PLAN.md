@@ -23,7 +23,7 @@
 | 6 — Lock in the habits | pragmatic-programmer | done | TECH-DEBT.md | 2026-10-08 |
 | 7 — Make it survive production | release-it | done | OPERATIONS.md + TECH-DEBT.md | 2026-10-08 |
 | 8 — Size for real load | system-design | done | OPERATIONS.md (sizing + diagnostic) | 2026-10-08 |
-| 9 — Get the data layer right | ddia-systems | pending | ARCHITECTURE.md | |
+| 9 — Get the data layer right | ddia-systems | done | ARCHITECTURE.md (data-layer audit) | 2026-10-08 |
 | Optional — Domain language | domain-driven-design | pending | ARCHITECTURE.md | |
 
 Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reason> · skipped: <reason>
@@ -64,5 +64,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 7 entry decision (release-it) — production-survival gates: pinned defect backlog (unassign-resets-status, no status whitelist, `?_host=` reset leak, same-password reset, SQLite avg_resolution), upload 413 handling, deployment/rollback reversibility, automation-vs-promote divergence pin. Commits `83d10ec`, `67fc90c`, `c6a6ae6`, `af87e8b`, `9197367`; OPERATIONS.md + load-smoke baselines; 259 tests green
 - [x] Phase 8 entry decision (system-design) — see Key Decisions; sprint 2 (backpressure + limiter audit) is the first load work that belongs to Phase 8 proper
 - [x] Phase 8 results (system-design, 2026-10-08) — OPERATIONS.md sizing section (real estimates, backpressure, Postgres pool, RPO/RTO, backup recipe, login-limit audit) + 8-row diagnostic 9/10; no app code changed (load knobs already in prod hands; limits already adequate)
-- [ ] Phase 9 entry decision (ddia-systems, data layer: SLA concurrency, transaction boundaries, SQLite/Postgres portability)
+- [x] Phase 9 entry + results (ddia-systems, 2026-10-08) — data-layer audit in ARCHITECTURE.md: portability verified clean (ilike/JSON/time-source), isolation defaults known (PG Read Committed, SQLite single-writer), 4 check-then-set races accepted-with-upgrade-paths (ticket-number, login counter, automation double-fire, view/helpful counters), replication n/a by scope, derived-data separation confirmed. Diagnostic 6/7 (~8/10); gap = quarterly restore-verify (operator checklist). No code changed
+- [ ] Phase 10 entry decision (domain-driven-design, optional — bounded contexts/ubiquitous language worth it only if a second consumer appears)
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
