@@ -269,9 +269,12 @@ class TestKnowledgeCharacterization:
             a2 = Article.query.get(aid)
             assert a2.title == "E3 new"
             assert a2.version == 2
-            # CHARACTERIZED: version row stores OLD content at bumped number
+            # CHARACTERIZED → fixed 2026-10-08: version rows are snapshots of
+            # the article AT that revision. v2 stores the post-edit content
+            # (was: the pre-edit "old" content, inconsistent with v1 which
+            # stores the created state)
             v = ArticleVersion.query.filter_by(article_id=aid, version=2).first()
-            assert v.content == "old"
+            assert v.content == "new"
 
     def test_versions_agent_can_view(self, client, app, db, admin_user, agent_user):
         """Lines 142-154: agent versions page renders."""

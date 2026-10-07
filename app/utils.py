@@ -227,20 +227,15 @@ def get_agent_performance():
             assigned_to=agent.id, status="resolved"
         ).count()
 
-        avg_resolution = (
-            db.session.query(
-                db.func.avg(
-                    db.func.extract("epoch", Ticket.resolved_at - Ticket.created_at)
-                    / 3600
-                )
-            )
-            .filter(
-                Ticket.assigned_to == agent.id,
-                Ticket.status == "resolved",
-                Ticket.resolved_at.isnot(None),
-            )
-            .scalar()
-        )
+        avg_resolution = None
+        resolved_tickets = Ticket.query.filter_by(
+            assigned_to=agent.id, status="resolved"
+        ).all()
+        resolution_times = [
+            t.resolution_time for t in resolved_tickets if t.resolution_time
+        ]
+        if resolution_times:
+            avg_resolution = sum(resolution_times) / len(resolution_times)
 
         performance.append(
             {

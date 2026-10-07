@@ -785,7 +785,11 @@ class TestEditRoute:
 
             ticket = Ticket.query.get(ticket.id)
             assert ticket.assigned_to is None
-            assert ticket.status == "new"
+            # CHARACTERIZED → fixed 2026-10-08: unassigning no longer resets a
+            # progressed status to "new"; only None/new/assigned tickets
+            # regress to "new", in_progress is preserved (unassign doesn't
+            # destroy workflow state)
+            assert ticket.status == "in_progress"
 
 
 class TestUpdateStatusBranches:
@@ -885,24 +889,27 @@ class TestUpdateStatusBranches:
             }
             assert Ticket.query.get(ticket.id).status == "new"
 
-    def test_update_status_no_validates_status_value(
+    def test_update_status_rejects_bogus_status_value(
         self, client, app, db, admin_user
     ):
-        # CHARACTERIZED: update_status accepts any non-empty status string;
-        # only the DB CHECK constraint rejects it, surfacing as an unhandled
-        # IntegrityError (HTTP 500) — suspected bug, see TECH-DEBT Debt Ledger
-        from sqlalchemy.exc import IntegrityError
-
+        # CHARACTERIZED → fixed 2026-10-08: update_status validates against
+        # TICKET_STATUSES before assignment; a bogus status now flashes
+        # "Invalid status." and leaves the ticket unchanged instead of
+        # surfacing the DB CHECK IntegrityError as an HTTP 500
         with app.app_context():
             client.post(
                 "/login", data={"username": "admin", "password": "Admin@123456"}
             )
             ticket = self._make_ticket(db, "TKT-220005", created_by=admin_user.id)
 
-            with pytest.raises(IntegrityError):
-                client.post(
-                    f"/tickets/{ticket.id}/update-status", data={"status": "bogus"}
-                )
+            response = client.post(
+                f"/tickets/{ticket.id}/update-status",
+                data={"status": "bogus"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Invalid status" in response.data
+            assert Ticket.query.get(ticket.id).status == "new"
 
 
 class TestAssignEdges:
@@ -1266,21 +1273,24 @@ class TestAttachmentBranches:
             assert Attachment.query.filter_by(ticket_id=ticket.id).count() == 0
             assert not (tmp_path.parent / "escaped_note.txt").exists()
 
-    def test_upload_non_file_value_crashes(self, client, app, db, admin_user):
-        # CHARACTERIZED: a plain form field named 'file' passes WTForms
-        # DataRequired as a str, then the route dereferences .filename and
-        # raises AttributeError (HTTP 500) — no isinstance guard at
-        # tickets.py:411-412; suspected bug, see TECH-DEBT Debt Ledger
+    def test_upload_non_file_value_flashes_invalid(self, client, app, db, admin_user):
+        # CHARACTERIZED → fixed 2026-10-08: a plain form field named 'file'
+        # (a str, not multipart FileStorage) now flashes "Invalid file."
+        # instead of raising AttributeError on .filename (HTTP 500)
         with app.app_context():
             client.post(
                 "/login", data={"username": "admin", "password": "Admin@123456"}
             )
             ticket = self._ticket(db, "TKT-260008", admin_user.id)
 
-            with pytest.raises(AttributeError):
-                client.post(
-                    f"/tickets/{ticket.id}/attachments", data={"file": "not-a-file"}
-                )
+            response = client.post(
+                f"/tickets/{ticket.id}/attachments",
+                data={"file": "not-a-file"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Invalid file" in response.data
+            assert Attachment.query.filter_by(ticket_id=ticket.id).count() == 0
 
 
 class TestDownloadBranches:

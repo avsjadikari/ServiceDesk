@@ -16,6 +16,7 @@ from flask import (
 )
 from flask_login import current_user, login_required
 from sqlalchemy.orm import joinedload
+from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from app import db
@@ -137,7 +138,8 @@ def _apply_form_to_ticket(ticket, form):
         ticket.promote_status_if_new()
     else:
         ticket.assigned_to = None
-        ticket.status = "new"
+        if ticket.status in (None, "new", "assigned"):
+            ticket.status = "new"
 
 
 @tickets.route("/tickets/new", methods=["GET", "POST"])
@@ -251,6 +253,12 @@ def update_status(ticket_id):
     if not new_status:
         if request.is_json:
             return jsonify({"success": False, "error": "Invalid status"}), 400
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    if new_status not in TICKET_STATUSES:
+        if request.is_json:
+            return jsonify({"success": False, "error": "Invalid status"}), 400
+        flash("Invalid status.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     old_status = ticket.status
@@ -418,7 +426,10 @@ def upload_attachment(ticket_id):
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     upload = form.file.data
-    if not upload or not upload.filename:
+    if not isinstance(upload, FileStorage):
+        flash("Invalid file.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+    if not upload.filename:
         flash("No file selected.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 

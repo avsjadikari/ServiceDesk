@@ -183,12 +183,11 @@ class TestAnalyticsCharacterization:
             entry = next(p for p in data if p["agent"] == "Agent User")
             assert entry["assigned"] == 1
             assert entry["resolved"] == 1
-            # CHARACTERIZED: SQLite computes garbage avg_resolution_hours (constant
-            # -58574100.0) because SQLAlchemy compiles `extract('epoch', resolved_at -
-            # created_at)` to STRFTIME('%s', <string minus>) where the string date
-            # subtraction collapses to 0. True resolution = 8.0h. Suspected bug in
-            # app.utils.get_agent_performance, see TECH-DEBT Debt Ledger.
-            assert entry["avg_resolution"] == -58574100.0
+            # CHARACTERIZED → fixed 2026-10-08: avg_resolution_hours is now computed in
+            # Python from the model's resolution_time property instead of a
+            # DB-side `extract('epoch', ...)` that compiled to garbage on
+            # SQLite (constant -58574100.0). True resolution = 8.0h.
+            assert entry["avg_resolution"] == 8.0
 
     def test_sla_api_mttr_and_active_breached(
         self, client, app, db, admin_user, agent_user

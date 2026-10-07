@@ -93,10 +93,7 @@ def new():
         db.session.commit()
 
         flash(f'Article "{article.title}" created successfully.', "success")
-
-        if current_user.is_agent():
-            return redirect(url_for("knowledge.view", article_id=article.id))
-        return redirect(url_for("knowledge.index"))
+        return redirect(url_for("knowledge.view", article_id=article.id))
 
     return render_template("knowledge/new.html", form=form)
 
@@ -111,8 +108,6 @@ def edit(article_id):
     form = ArticleForm(obj=article)
 
     if form.validate_on_submit():
-        old_content = article.content
-
         article.title = form.title.data
         article.content = form.content.data
         article.category = form.category.data
@@ -123,7 +118,7 @@ def edit(article_id):
         version = ArticleVersion(
             article_id=article.id,
             version=article.version,
-            content=old_content,
+            content=article.content,
             created_by=current_user.id,
         )
         db.session.add(version)
