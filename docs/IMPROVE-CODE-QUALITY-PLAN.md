@@ -18,7 +18,7 @@
 | 1 — Build the safety net | working-with-legacy-code | done | TESTING.md + TECH-DEBT.md (GATE) | 2026-10-08 |
 | 2 — Make the code readable | clean-code | done | TECH-DEBT.md | 2026-10-08 |
 | 3 — Apply named refactorings | refactoring-patterns | done | TECH-DEBT.md | 2026-10-08 |
-| 4 — Reduce complexity | software-design-philosophy | pending | TECH-DEBT.md | |
+| 4 — Reduce complexity | software-design-philosophy | done | TECH-DEBT.md | 2026-10-08 |
 | 5 — Draw the architecture boundary | clean-architecture | pending | ARCHITECTURE.md | |
 | 6 — Lock in the habits | pragmatic-programmer | pending | TECH-DEBT.md | |
 | 7 — Make it survive production | release-it | pending | RELIABILITY.md | |
@@ -44,11 +44,14 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 2 | No CI gate now (structure+behavior commits kept separate) | Manual discipline still viable at 1 dev |
 | 2026-10-08 | 3 | Refactoring-patterns score (tickets.py): ~6.7 → 8/10; tuition: each step green-committed separately | Named refactorings: Move Method (`promote_status_if_new`), Extract Method (`_create_ticket`, `_apply_form_to_ticket`, `_apply_status_timestamps`), Replace Magic Number (`SNIFF_LENGTH`), enum-driven board columns |
 | 2026-10-08 | 3 | Phase 3 does NOT change behavior: defect fixes stay pinned+ledgered (unassign-resets-status, status whitelist) — those surface in Phase 6/7 hardening | Preserved φ arrow: structural change never mixed with behavioral change |
+| 2026-10-08 | 4 | Philosophy-of-software-design audit (ticket core): ~5.5 → 8/10. Applied: info-hiding of ticket audit mapping (`log_ticket_audit`), enum-driven metrics/colors, module-header contract for `utils.py` | Diagnostic rows 1-4,6,8 now pass; residual: `utils.py` grab-bag split + `auth.py` 796-line module size belong to Phase 5 (boundaries) |
+| 2026-10-08 | 4 | Module depth verdicts: `email_utils` (SMTP+async queue) deep ✓; `models.py` owns DB constraints ✓; `__init__.py` wiring coil — revisit after Phase 5 map | Depth over size: judged by interface-vs-implementation, not line count |
 
 ## Next Actions
 
 - [x] Phase 1 entry decision (agent + user, 2026-10-08)
 - [x] Phase 2 entry decision (clean-code, 2026-10-08)
 - [x] Phase 3 entry decision (refactoring-patterns, 2026-10-08) — status-promote helper, enum constants, route decomposition, SNIFF_LENGTH, corrected docstring; 3 commits, 254 tests green each step
-- [ ] Phase 4 entry decision (software-design-philosophy) — tickets.py at 8/10; remaining: Long Method mostly dissolved, timestamps ifs, deferred upload-size robustness (Phase 7)
+- [x] Phase 4 entry decision (software-design-philosophy, 2026-10-08) — audit mapping centralized, enum-driven utils, module contracts stated; 8/10; settled the deferral of utils/auth size to Phase 5
+- [ ] Phase 5 entry decision (clean-architecture) — produce ARCHITECTURE.md: draw module boundaries & dependency direction across app/ (routes ↔ models ↔ utils ↔ email/security/settings); target `utils.py` grab-bag split + `__init__.py` coil
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)

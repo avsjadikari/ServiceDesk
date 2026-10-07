@@ -23,6 +23,9 @@
 
 | Smell | Location | Refactoring | Status |
 |---|---|---|---|
+| Ticket audit-row wiring repeated 8× (`log_audit(current_user.id, action, "ticket", id, id, ...)`) | `routes/tickets.py` create/update/status/assign/comment/link-asset/upload/download | Extract `log_ticket_audit(ticket, action, details)` — hides the "a ticket maps to entity_type=ticket, entity_id=ticket_id=ticket.id" decision in one place | **resolved 2026-10-08** (`3c5c611`) |
+| `utils.py` = multi-concern grab-bag (numbering, SLA, audit, colors, automation, metrics, upload sniff) | `app/utils.py` | Module header now states its contract; each helper is deep with a simple interface. Further split (e.g. `analytics.py` helpers → analytics) deferred until boundaries firm up | **documented; split deferred → Phase 6** |
+| Status/priority/ticket literals repeated in metrics & color maps | `app/utils.py` | `TICKET_OPEN_STATUSES` added to enums; metrics/SLA/colors derive from enum tuples | **resolved 2026-10-08** (`3c5c611`) |
 | Status-promote duplication `if status == "new": status = "assigned"` ×3 | `routes/tickets.py` new / edit / assign | Extract `Ticket.promote_status_if_new()` (handles None + "new") | **resolved 2026-10-08** (`4ae319d`, `9140c56`) |
 | Magic status/priority/type strings | `routes/tickets.py`, `models.py`, forms, templates | Stop using bare literals in logic; reference `app/enums.py` tuples | **resolved (routes+models)** `4ae319d`/`efcda2d` — board columns + SLA check + column defaults now enum-driven. Still inline: `forms.py` choice labels (no label data in enums), templates render status/priority strings passed from routes |
 | Wrong docstring on `_can_view_ticket` (claims assignee can view; code checks creator only) | `routes/tickets.py:368` | Fix docstring — assignees are always agents here, so no separate branch exists | **resolved 2026-10-08** (`9140c56`) — behavior unchanged |
