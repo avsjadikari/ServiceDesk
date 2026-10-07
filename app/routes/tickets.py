@@ -33,6 +33,8 @@ from app.utils import (
 
 tickets = Blueprint("tickets", __name__)
 
+SNIFF_LENGTH = 512
+
 
 def _agent_users():
     return User.query.filter(User.role.in_(["agent", "admin"])).all()
@@ -54,6 +56,17 @@ def _notify(ticket, description, send_fn, *args):
             "Email send failed for ticket %s (%s)", ticket.id, description,
             exc_info=True,
         )
+
+
+def _apply_status_timestamps(ticket, new_status):
+    if new_status == "in_progress" and not ticket.first_response_at:
+        ticket.first_response_at = datetime.utcnow()
+
+    if new_status == "resolved":
+        ticket.resolved_at = datetime.utcnow()
+
+    if new_status == "closed":
+        ticket.closed_at = datetime.utcnow()
 
 
 @tickets.route("/tickets")
@@ -110,8 +123,42 @@ def board():
     return render_template(
         "tickets/board.html",
         columns=columns,
-        agents=User.query.filter(User.role.in_(["agent", "admin"])).all(),
+        agents=_agent_users(),
     )
+
+
+def _create_ticket(form, created_by_id):
+    ticket = Ticket(
+        ticket_number=generate_ticket_number(),
+        title=form.title.data,
+        description=form.description.data,
+        type=form.type.data,
+        priority=form.priority.data,
+        category=form.category.data,
+        created_by=created_by_id,
+        sla_deadline=calculate_sla_deadline(form.priority.data),
+    )
+
+    if form.assigned_to.data and form.assigned_to.data > 0:
+        ticket.assigned_to = form.assigned_to.data
+        ticket.promote_status_if_new()
+
+    return ticket
+
+
+def _apply_form_to_ticket(ticket, form):
+    ticket.title = form.title.data
+    ticket.description = form.description.data
+    ticket.type = form.type.data
+    ticket.priority = form.priority.data
+    ticket.category = form.category.data
+
+    if form.assigned_to.data and form.assigned_to.data > 0:
+        ticket.assigned_to = form.assigned_to.data
+        ticket.promote_status_if_new()
+    else:
+        ticket.assigned_to = None
+        ticket.status = "new"
 
 
 @tickets.route("/tickets/new", methods=["GET", "POST"])
@@ -123,21 +170,7 @@ def new():
     ]
 
     if form.validate_on_submit():
-        ticket = Ticket(
-            ticket_number=generate_ticket_number(),
-            title=form.title.data,
-            description=form.description.data,
-            type=form.type.data,
-            priority=form.priority.data,
-            category=form.category.data,
-            created_by=current_user.id,
-            sla_deadline=calculate_sla_deadline(form.priority.data),
-        )
-
-        if form.assigned_to.data and int(form.assigned_to.data) > 0:
-            ticket.assigned_to = int(form.assigned_to.data)
-            ticket.status = "assigned"
-
+        ticket = _create_ticket(form, current_user.id)
         db.session.add(ticket)
         db.session.commit()
 
@@ -203,20 +236,7 @@ def edit(ticket_id):
     ]
 
     if form.validate_on_submit():
-        ticket.title = form.title.data
-        ticket.description = form.description.data
-        ticket.type = form.type.data
-        ticket.priority = form.priority.data
-        ticket.category = form.category.data
-
-        if form.assigned_to.data and int(form.assigned_to.data) > 0:
-            ticket.assigned_to = int(form.assigned_to.data)
-            if ticket.status == "new":
-                ticket.status = "assigned"
-        else:
-            ticket.assigned_to = None
-            ticket.status = "new"
-
+        _apply_form_to_ticket(ticket, form)
         db.session.commit()
 
         log_audit(current_user.id, "update", "ticket", ticket.id, ticket.id)
@@ -244,14 +264,7 @@ def update_status(ticket_id):
     old_status = ticket.status
     ticket.status = new_status
 
-    if new_status == "in_progress" and not ticket.first_response_at:
-        ticket.first_response_at = datetime.utcnow()
-
-    if new_status == "resolved":
-        ticket.resolved_at = datetime.utcnow()
-
-    if new_status == "closed":
-        ticket.closed_at = datetime.utcnow()
+    _apply_status_timestamps(ticket, new_status)
 
     db.session.commit()
 
@@ -301,8 +314,7 @@ def assign(ticket_id):
             return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
         ticket.assigned_to = assignee_id
-        if ticket.status == "new":
-            ticket.status = "assigned"
+        ticket.promote_status_if_new()
         db.session.commit()
 
         log_audit(
@@ -388,8 +400,8 @@ def link_asset(ticket_id):
 
 
 def _can_view_ticket(ticket):
-    """A user can view a ticket if they are the reporter, an agent/admin,
-    or the assignee."""
+    """A user can view a ticket if they are the reporter or an agent/admin.
+    (Assignees are always agents here, so no separate assignee branch.)"""
     if not current_user.is_authenticated:
         return False
     if current_user.is_agent():
@@ -430,46 +442,46 @@ def upload_attachment(ticket_id):
                 flash(err, "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-    f = form.file.data
-    if not f or not f.filename:
+    upload = form.file.data
+    if not upload or not upload.filename:
         flash("No file selected.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     max_bytes = current_app.config.get("MAX_CONTENT_LENGTH")
-    if max_bytes and f.content_length and f.content_length > max_bytes:
+    if max_bytes and upload.content_length and upload.content_length > max_bytes:
         flash("File is too large.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-    if not _attachment_allowed(f.filename, f.mimetype):
+    if not _attachment_allowed(upload.filename, upload.mimetype):
         flash("This file type is not allowed.", "danger")
         current_app.logger.warning(
             "Rejected attachment upload user_id=%s ticket_id=%s "
             "filename=%s mime=%s",
             current_user.id,
             ticket.id,
-            f.filename,
-            f.mimetype,
+            upload.filename,
+            upload.mimetype,
         )
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-    f.stream.seek(0)
-    sniff = f.stream.read(512)
-    f.stream.seek(0)
-    if not validate_upload_sniff(f.filename, sniff):
+    upload.stream.seek(0)
+    sniff = upload.stream.read(SNIFF_LENGTH)
+    upload.stream.seek(0)
+    if not validate_upload_sniff(upload.filename, sniff):
         flash("File content does not match its extension.", "danger")
         current_app.logger.warning(
             "Rejected attachment upload (magic-bytes mismatch) "
             "user_id=%s ticket_id=%s filename=%s mime=%s",
             current_user.id,
             ticket.id,
-            f.filename,
-            f.mimetype,
+            upload.filename,
+            upload.mimetype,
         )
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-    safe_name = secure_filename(f.filename)
+    safe_name = secure_filename(upload.filename)
     unique_name = f"{uuid.uuid4().hex}_{safe_name}"
-    if not _store_attachment(ticket, f, safe_name, unique_name):
+    if not _store_attachment(ticket, upload, safe_name, unique_name):
         flash("Invalid filename.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
