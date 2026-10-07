@@ -16,7 +16,7 @@
 | Phase | Skill | Status | Artifact | Date |
 |---|---|---|---|---|
 | 1 — Build the safety net | working-with-legacy-code | done | TESTING.md + TECH-DEBT.md (GATE) | 2026-10-08 |
-| 2 — Make the code readable | clean-code | pending | TECH-DEBT.md | |
+| 2 — Make the code readable | clean-code | in-progress | TECH-DEBT.md | |
 | 3 — Apply named refactorings | refactoring-patterns | pending | TECH-DEBT.md | |
 | 4 — Reduce complexity | software-design-philosophy | pending | TECH-DEBT.md | |
 | 5 — Draw the architecture boundary | clean-architecture | pending | ARCHITECTURE.md | |
