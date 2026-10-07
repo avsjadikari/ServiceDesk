@@ -9,6 +9,12 @@ Create an environment and install dependencies with `python -m venv .venv && sou
 ## Coding Style & Naming Conventions
 Follow existing Python style: 4-space indentation, `snake_case` for functions and variables, `PascalCase` for SQLAlchemy models and WTForms classes, and short route modules named by feature. Keep templates grouped by feature and name them by action, for example `tickets/view.html`, `tickets/board.html`, `analytics/index.html`, or `auth/login.html`. Match the repository’s current style before introducing new abstractions. No formatter or linter is configured here, so keep changes PEP 8-aligned and consistent with adjacent code.
 
+## Engineering Habits (DRY + behavior preservation)
+- Single source of truth: each domain fact lives in exactly one place. Ticket construction (`build_ticket`), SLA deadline (`calculate_sla_deadline`), status/priority literals (`app/enums.py`), ticket-audit wiring (`log_ticket_audit`) — never re-derive these in a route.
+- Rule of Three: extract shared logic when the third call site appears.
+- Structure changes and bug-fix commits never share a commit; fix the root cause where every caller routes through.
+- Pin a bug with a `# CHARACTERIZED` test before fixing or deferring it; never fix silently (see `docs/TECH-DEBT.md`).
+
 ## Testing Guidelines
 Tests use `pytest`, `pytest-flask`, and `pytest-cov`. Add new tests in `tests/test_<feature>.py` and reuse fixtures from `tests/conftest.py` where possible. Dedicated test suites exist for `tests/test_analytics.py` and `tests/test_i18n.py`. The test suite uses an in-memory SQLite database and disables CSRF, so feature tests should prefer client requests over manual unit scaffolding. Run `pytest` before opening a PR; use coverage output when touching app factory, auth, or persistence logic. CSRF can be re-enabled per test when needed (e.g. `app.config["WTF_CSRF_ENABLED"] = True` inside the test) — `TestTwoFactorCsrf` in `tests/test_auth.py` does this to assert the `/login-2fa` page renders a valid CSRF token and that a POST without one is rejected (HTTP 400).
 

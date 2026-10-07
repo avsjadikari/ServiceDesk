@@ -25,7 +25,7 @@
 |---|---|---|---|
 | Ticket audit-row wiring repeated 8× (`log_audit(current_user.id, action, "ticket", id, id, ...)`) | `routes/tickets.py` create/update/status/assign/comment/link-asset/upload/download | Extract `log_ticket_audit(ticket, action, details)` — hides the "a ticket maps to entity_type=ticket, entity_id=ticket_id=ticket.id" decision in one place | **resolved 2026-10-08** (`3c5c611`) |
 | `utils.py` = multi-concern grab-bag (numbering, SLA, audit, colors, automation, metrics, upload sniff) | `app/utils.py` | Module header now states its contract; each helper is deep with a simple interface. Further split (e.g. `analytics.py` helpers → analytics) deferred until boundaries firm up | **documented; split deferred → Phase 6** |
-| Ticket-creation wiring duplicated ×3: tickets.py `_create_ticket`, portal.py:93, api.py:92 each re-resolve assigned_to + SLA | routes/tickets, portal, api | Rule of Three reached — extract shared ticket-creation into domain layer | Phase 6 |
+| Ticket-creation wiring duplicated ×3: tickets.py `_create_ticket`, portal.py:93, api.py:92 each re-resolve assigned_to + SLA | routes/tickets, portal, api | `build_ticket(...)` domain factory in utils.py — numbering, SLA, field mapping, promote-on-assign in one place | **resolved 2026-10-08** (`4e3dcf2`) |
 | Status/priority/ticket literals repeated in metrics & color maps | `app/utils.py` | `TICKET_OPEN_STATUSES` added to enums; metrics/SLA/colors derive from enum tuples | **resolved 2026-10-08** (`3c5c611`) |
 | Status-promote duplication `if status == "new": status = "assigned"` ×3 | `routes/tickets.py` new / edit / assign | Extract `Ticket.promote_status_if_new()` (handles None + "new") | **resolved 2026-10-08** (`4ae319d`, `9140c56`) |
 | Magic status/priority/type strings | `routes/tickets.py`, `models.py`, forms, templates | Stop using bare literals in logic; reference `app/enums.py` tuples | **resolved (routes+models)** `4ae319d`/`efcda2d` — board columns + SLA check + column defaults now enum-driven. Still inline: `forms.py` choice labels (no label data in enums), templates render status/priority strings passed from routes |
@@ -33,6 +33,7 @@
 | Upload size branch ineffective (part-level Content-Length only; Flask 413 fires first) | `routes/tickets.py` upload_attachment | Revisit with `LimitBytes`/413 handling — robustness, belongs with Phase 7 (release-it) | **deferred → Phase 7** |
 | Sniff sample length bare literal `512` | `routes/tickets.py` upload_attachment | `SNIFF_LENGTH = 512` constant | **resolved 2026-10-08** (`9140c56`) |
 | Duplicated "rejected attachment" warning-log block ×2 | `routes/tickets.py` upload_attachment | Rule of Three: extract `_log_rejected_upload(...)` on 3rd occurrence | open (tolerated at 2) |
+| Status-transition knowledge split: `_execute_automation_rule` sets `status="assigned"` unconditionally; `promote_status_if_new` promotes only when None/"new" | `app/utils.py:100` + `models.py` | Suspected behavior divergence (automation assign on an in-progress ticket re-opens it as "assigned"). Decide in Phase 7 hardening; pin with a test first | open |
 | CRLF/LF mixed line endings | `tests/test_tickets.py` (pre-existing) | Normalize to LF if repo adopts a formatter | skip unless ruff added |
 
 ## Sprout / Wrap Register

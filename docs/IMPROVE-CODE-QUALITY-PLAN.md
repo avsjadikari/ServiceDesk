@@ -20,7 +20,7 @@
 | 3 — Apply named refactorings | refactoring-patterns | done | TECH-DEBT.md | 2026-10-08 |
 | 4 — Reduce complexity | software-design-philosophy | done | TECH-DEBT.md | 2026-10-08 |
 | 5 — Draw the architecture boundary | clean-architecture | done | ARCHITECTURE.md | 2026-10-08 |
-| 6 — Lock in the habits | pragmatic-programmer | pending | TECH-DEBT.md | |
+| 6 — Lock in the habits | pragmatic-programmer | done | TECH-DEBT.md | 2026-10-08 |
 | 7 — Make it survive production | release-it | pending | RELIABILITY.md | |
 | 8 — Size for real load | system-design | pending | ARCHITECTURE.md + RELIABILITY.md | |
 | 9 — Get the data layer right | ddia-systems | pending | ARCHITECTURE.md | |
@@ -48,6 +48,7 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 4 | Module depth verdicts: `email_utils` (SMTP+async queue) deep ✓; `models.py` owns DB constraints ✓; `__init__.py` wiring coil — revisit after Phase 5 map | Depth over size: judged by interface-vs-implementation, not line count |
 | 2026-10-08 | 5 | ARCHITECTURE.md: 3/7 diagnostic → boundary policy = **partial**, no four-ring rewrite (5.9 kLoC, 1 dev, low volatility). Pure-core extraction for high-risk math (SLA) adopted | Full de-correlation rejected on cost/volatility; options-bought vs not-bought documented |
 | 2026-10-08 | 5 | `calculate_sla_deadline` made domain-pure (injectable `sla_config` + `now`); +2 pure tests | Removes `current_app` leakage at the domain edge; unit-testable without DB |
+| 2026-10-08 | 6 | Pragmatic diagnostic ~7/10: DRY (build_ticket), orthogonality (accepted model fusion), broken-windows policy in effect. Failing rows 1/5/6 are deployment/process scope → Phase 7 (release-it). `auth.py` 796 LoC kept (feature-cohesive; split would be tactical noise) | Every business rule in one place reached for ticket creation/SLA/audit/enums; automation status-transition divergence suspected and rowed |
 
 ## Next Actions
 
@@ -56,5 +57,6 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 - [x] Phase 3 entry decision (refactoring-patterns, 2026-10-08) — status-promote helper, enum constants, route decomposition, SNIFF_LENGTH, corrected docstring; 3 commits, 254 tests green each step
 - [x] Phase 4 entry decision (software-design-philosophy, 2026-10-08) — audit mapping centralized, enum-driven utils, module contracts stated; 8/10; settled the deferral of utils/auth size to Phase 5
 - [x] Phase 5 entry decision (clean-architecture, 2026-10-08) — ARCHITECTURE.md written; boundary policy: partial, pure-core extraction for SLA; Slack-friendly debt map (controller orchestration, entity/persistence fusion, `__init__` coil)
-- [ ] Phase 6 entry decision (pragmatic-programmer) — habits + build/portable patterns; trim `routes/auth.py` (796 LoC) and portal/API copies of ticket-creation logic (portal.py:93 & api.py:92 each re-implement `calculate_sla_deadline` wiring) — Rule of Three now at 3 call sites for a `_create_ticket`-style helper
+- [x] Phase 6 entry decision (pragmatic-programmer, 2026-10-08) — `build_ticket` DRY factory across agent/portal/API; pragmatic 7-row ≈7/10; automation status divergence rowed
+- [ ] Phase 7 entry decision (release-it) — production-survival gates: pinned defect backlog (unassign-resets-status, no status whitelist, `?_host=` reset leak, same-password reset, SQLite avg_resolution), upload 413 handling, deployment/rollback reversibility, automation-vs-promote divergence pin
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
