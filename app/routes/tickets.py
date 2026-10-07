@@ -34,20 +34,21 @@ from app.utils import (
 tickets = Blueprint("tickets", __name__)
 
 
+def _agent_users():
+    return User.query.filter(User.role.in_(["agent", "admin"])).all()
+
+
 @tickets.route("/tickets")
 @login_required
 def index():
     form = TicketFilterForm()
     form.assigned_to.choices = [(0, "All")] + [
-        (u.id, u.full_name)
-        for u in User.query.filter(User.role.in_(["agent", "admin"])).all()
+        (u.id, u.full_name) for u in _agent_users()
     ]
 
     query = Ticket.query
 
-    if current_user.is_agent():
-        pass
-    else:
+    if not current_user.is_agent():
         query = query.filter_by(created_by=current_user.id)
 
     status = request.args.get("status")
@@ -100,8 +101,7 @@ def board():
 def new():
     form = TicketForm()
     form.assigned_to.choices = [(0, "Auto-assign")] + [
-        (u.id, u.full_name)
-        for u in User.query.filter(User.role.in_(["agent", "admin"])).all()
+        (u.id, u.full_name) for u in _agent_users()
     ]
 
     if form.validate_on_submit():
@@ -168,7 +168,7 @@ def view(ticket_id):
         attachments=ticket.attachments.order_by(Attachment.created_at.desc()).all(),
         status_color=status_color,
         priority_color=priority_color,
-        users=User.query.filter(User.role.in_(["agent", "admin"])).all(),
+        users=_agent_users(),
     )
 
 
@@ -181,8 +181,7 @@ def edit(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     form = TicketForm(obj=ticket)
     form.assigned_to.choices = [(0, "Unassigned")] + [
-        (u.id, u.full_name)
-        for u in User.query.filter(User.role.in_(["agent", "admin"])).all()
+        (u.id, u.full_name) for u in _agent_users()
     ]
 
     if form.validate_on_submit():
@@ -219,41 +218,42 @@ def update_status(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     new_status = request.json.get("status") if request.is_json else request.form.get("status")
 
-    if new_status:
-        old_status = ticket.status
-        ticket.status = new_status
-
-        if new_status == "in_progress" and not ticket.first_response_at:
-            ticket.first_response_at = datetime.utcnow()
-
-        if new_status == "resolved":
-            ticket.resolved_at = datetime.utcnow()
-
-        if new_status == "closed":
-            ticket.closed_at = datetime.utcnow()
-
-        db.session.commit()
-
-        log_audit(
-            current_user.id,
-            "status_change",
-            "ticket",
-            ticket.id,
-            ticket.id,
-            {"old_status": old_status, "new_status": new_status},
-        )
-
-        from app.email_utils import send_ticket_status_changed
-
-        send_ticket_status_changed(ticket, old_status, new_status)
-
+    if not new_status:
         if request.is_json:
-            return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
+            return jsonify({"success": False, "error": "Invalid status"}), 400
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-        flash(f"Ticket status updated to {new_status}.", "success")
+    old_status = ticket.status
+    ticket.status = new_status
+
+    if new_status == "in_progress" and not ticket.first_response_at:
+        ticket.first_response_at = datetime.utcnow()
+
+    if new_status == "resolved":
+        ticket.resolved_at = datetime.utcnow()
+
+    if new_status == "closed":
+        ticket.closed_at = datetime.utcnow()
+
+    db.session.commit()
+
+    log_audit(
+        current_user.id,
+        "status_change",
+        "ticket",
+        ticket.id,
+        ticket.id,
+        {"old_status": old_status, "new_status": new_status},
+    )
+
+    from app.email_utils import send_ticket_status_changed
+
+    send_ticket_status_changed(ticket, old_status, new_status)
 
     if request.is_json:
-        return jsonify({"success": False, "error": "Invalid status"}), 400
+        return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
+
+    flash(f"Ticket status updated to {new_status}.", "success")
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
@@ -431,9 +431,9 @@ def upload_attachment(ticket_id):
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     f.stream.seek(0)
-    head = f.stream.read(512)
+    sniff = f.stream.read(512)
     f.stream.seek(0)
-    if not validate_upload_sniff(f.filename, head):
+    if not validate_upload_sniff(f.filename, sniff):
         flash("File content does not match its extension.", "danger")
         current_app.logger.warning(
             "Rejected attachment upload (magic-bytes mismatch) "
@@ -447,6 +447,15 @@ def upload_attachment(ticket_id):
 
     safe_name = secure_filename(f.filename)
     unique_name = f"{uuid.uuid4().hex}_{safe_name}"
+    if not _store_attachment(ticket, f, safe_name, unique_name):
+        flash("Invalid filename.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    flash("File uploaded successfully.", "success")
+    return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+
+def _store_attachment(ticket, upload, safe_name, unique_name):
     upload_dir = current_app.config.get("UPLOAD_FOLDER")
     os.makedirs(upload_dir, exist_ok=True)
     dest_path = os.path.join(upload_dir, unique_name)
@@ -454,10 +463,9 @@ def upload_attachment(ticket_id):
     real_dir = os.path.realpath(upload_dir)
     real_path = os.path.realpath(dest_path)
     if not real_path.startswith(real_dir + os.sep):
-        flash("Invalid filename.", "danger")
-        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+        return False
 
-    f.save(dest_path)
+    upload.save(dest_path)
     file_size = os.path.getsize(dest_path)
 
     attachment = Attachment(
@@ -465,7 +473,7 @@ def upload_attachment(ticket_id):
         filename=safe_name,
         filepath=unique_name,
         file_size=file_size,
-        mime_type=f.mimetype,
+        mime_type=upload.mimetype,
         uploaded_by=current_user.id,
     )
     db.session.add(attachment)
@@ -479,8 +487,7 @@ def upload_attachment(ticket_id):
         ticket.id,
         {"filename": safe_name, "size": file_size},
     )
-    flash("File uploaded successfully.", "success")
-    return redirect(url_for("tickets.view", ticket_id=ticket_id))
+    return True
 
 
 @tickets.route("/attachments/<int:attachment_id>")
