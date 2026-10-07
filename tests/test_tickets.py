@@ -1,5 +1,6 @@
 import pytest
-from app.models import Attachment, Ticket, User
+from unittest.mock import patch
+from app.models import Attachment, Comment, Ticket, User
 
 
 class TestTicketCreation:
@@ -528,15 +529,16 @@ class TestIndexFilters:
             assert b"TKT-200005" in response.data
             assert b"TKT-200006" not in response.data
 
-    def test_index_non_numeric_assigned_to_crashes(self, client, app, admin_user):
-        # CHARACTERIZED: unguarded int() on ?assigned_to raises ValueError
-        # (HTTP 500 in production) — suspected bug, see TECH-DEBT Debt Ledger
+    def test_index_non_numeric_assigned_to_is_ignored(self, client, app, admin_user):
+        # FIX (2026-10-08): non-numeric ?assigned_to no longer crashes
+        # (was ValueError / 500, Debt Ledger). type=int coerces to None,
+        # so the filter is skipped and all tickets render.
         with app.app_context():
             client.post(
                 "/login", data={"username": "admin", "password": "Admin@123456"}
             )
-            with pytest.raises(ValueError):
-                client.get("/tickets?assigned_to=abc")
+            response = client.get("/tickets?assigned_to=abc")
+            assert response.status_code == 200
 
 
 class TestNewTicketBranches:
@@ -1050,12 +1052,11 @@ class TestLinkAsset:
                 == 1
             )
 
-    def test_link_asset_non_numeric_asset_id_crashes(
+    def test_link_asset_non_numeric_asset_id_is_rejected(
         self, client, app, db, admin_user
     ):
-        # CHARACTERIZED: unguarded int() on asset_id raises ValueError
-        # (HTTP 500 in production); the sibling assign route guards this —
-        # suspected bug, see TECH-DEBT Debt Ledger
+        # FIX (2026-10-08): non-numeric asset_id no longer crashes
+        # (was ValueError / 500, Debt Ledger); now flashes "Invalid asset."
         with app.app_context():
             client.post(
                 "/login", data={"username": "admin", "password": "Admin@123456"}
@@ -1072,10 +1073,14 @@ class TestLinkAsset:
             db.session.add(ticket)
             db.session.commit()
 
-            with pytest.raises(ValueError):
-                client.post(
-                    f"/tickets/{ticket.id}/link-asset", data={"asset_id": "abc"}
-                )
+            response = client.post(
+                f"/tickets/{ticket.id}/link-asset",
+                data={"asset_id": "abc"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Invalid asset." in response.data
+            assert Ticket.query.get(ticket.id).asset_id is None
 
 
 class TestAttachmentBranches:
@@ -1393,3 +1398,50 @@ class TestCanViewTicketHelper:
 
             with app.test_request_context():
                 assert _can_view_ticket(ticket) is False
+
+
+class TestEmailSendGuards:
+    """FIX (2026-10-08): a failing email send must not fail the request
+    (was unguarded -> HTTP 500 after commit, Debt Ledger). Routes now
+    route email through _notify(), which catches and logs."""
+
+    def _login(self, client):
+        client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+    def test_create_ticket_email_failure_still_redirects(self, client, app, db, admin_user):
+        with app.app_context():
+            self._login(client)
+            with patch("app.email_utils.send_ticket_created", side_effect=Exception("SMTP down")):
+                response = client.post(
+                    "/tickets/new",
+                    data={
+                        "title": "Email-fail ticket",
+                        "description": "d",
+                        "type": "incident",
+                        "priority": "medium",
+                        "category": "Hardware",
+                    },
+                )
+            assert response.status_code == 302
+            assert Ticket.query.filter_by(title="Email-fail ticket").count() == 1
+
+    def test_comment_email_failure_still_redirects(self, client, app, db, admin_user):
+        with app.app_context():
+            self._login(client)
+            ticket = Ticket(
+                ticket_number="TKT-290001",
+                title="Comment target",
+                description="d",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+            with patch("app.email_utils.send_ticket_comment", side_effect=Exception("SMTP down")):
+                response = client.post(
+                    f"/tickets/{ticket.id}/comment",
+                    data={"content": "a note"},
+                )
+            assert response.status_code == 302
+            assert Comment.query.filter_by(ticket_id=ticket.id).count() == 1

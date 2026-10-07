@@ -38,6 +38,24 @@ def _agent_users():
     return User.query.filter(User.role.in_(["agent", "admin"])).all()
 
 
+def _to_int(value):
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _notify(ticket, description, send_fn, *args):
+    """A failing email must not fail the request; log and continue."""
+    try:
+        send_fn(*args)
+    except Exception:
+        current_app.logger.warning(
+            "Email send failed for ticket %s (%s)", ticket.id, description,
+            exc_info=True,
+        )
+
+
 @tickets.route("/tickets")
 @login_required
 def index():
@@ -54,7 +72,7 @@ def index():
     status = request.args.get("status")
     priority = request.args.get("priority")
     category = request.args.get("category")
-    assigned_to = request.args.get("assigned_to")
+    assigned_to = request.args.get("assigned_to", type=int)
 
     if status:
         query = query.filter_by(status=status)
@@ -63,7 +81,7 @@ def index():
     if category:
         query = query.filter_by(category=category)
     if assigned_to:
-        query = query.filter_by(assigned_to=int(assigned_to))
+        query = query.filter_by(assigned_to=assigned_to)
 
     page = request.args.get("page", 1, type=int)
     tickets = (
@@ -129,7 +147,7 @@ def new():
 
         from app.email_utils import send_ticket_created
 
-        send_ticket_created(ticket)
+        _notify(ticket, "create", send_ticket_created)
 
         flash(f"Ticket {ticket.ticket_number} created successfully.", "success")
 
@@ -248,7 +266,7 @@ def update_status(ticket_id):
 
     from app.email_utils import send_ticket_status_changed
 
-    send_ticket_status_changed(ticket, old_status, new_status)
+    _notify(ticket, "status change", send_ticket_status_changed, old_status, new_status)
 
     if request.is_json:
         return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
@@ -298,7 +316,7 @@ def assign(ticket_id):
 
         from app.email_utils import send_ticket_assigned
 
-        send_ticket_assigned(ticket)
+        _notify(ticket, "assignment", send_ticket_assigned)
 
         flash(
             f"Ticket assigned to {ticket.assignee.full_name if ticket.assignee else 'Unknown'}.",
@@ -331,7 +349,7 @@ def add_comment(ticket_id):
 
         from app.email_utils import send_ticket_comment
 
-        send_ticket_comment(ticket, comment)
+        _notify(ticket, "comment", send_ticket_comment, comment)
 
         flash("Comment added successfully.", "success")
 
@@ -348,7 +366,11 @@ def link_asset(ticket_id):
     asset_id = request.form.get("asset_id")
 
     if asset_id:
-        ticket.asset_id = int(asset_id)
+        asset_id = _to_int(asset_id)
+        if asset_id is None:
+            flash("Invalid asset.", "danger")
+            return redirect(url_for("tickets.view", ticket_id=ticket_id))
+        ticket.asset_id = asset_id
         db.session.commit()
 
         log_audit(
