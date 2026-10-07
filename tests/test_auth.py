@@ -835,12 +835,11 @@ class TestForgotPassword:
         assert mock_send.call_count == 1
         sent_user, reset_url = mock_send.call_args[0]
         assert sent_user.id == admin_user.id
-        # CHARACTERIZED: reset URL carries a junk `?_host=` query — Flask's
-        # url_for does not consume the `_host` kwarg passed by
-        # _external_url (app/routes/auth.py:33-41), so the Host-poisoning
-        # guard is inert and the value leaks into the link — suspected bug,
-        # TECH-DEBT ledger candidate
-        assert "?_host=" in reset_url
+        # CHARACTERIZED → fixed 2026-10-08: url_for(_external=True) builds the
+        # host from SERVER_NAME when configured (canonical host defeats
+        # Host-header poisoning) and from the request host in local dev; the
+        # inert `_host` kwarg that leaked a junk `?_host=` query is removed
+        assert "?_host=" not in reset_url
         token = urlsplit(reset_url).path.rsplit("/", 1)[-1]
         assert verify_password_reset_token(token) == admin_user.id
 
@@ -932,10 +931,9 @@ class TestResetPassword:
     def test_reset_password_accepts_the_same_password(
         self, client, app, db, regular_user
     ):
-        # CHARACTERIZED: resetting to the *same* password succeeds — the
-        # "must be different" guard at app/routes/auth.py:264 compares the
-        # plaintext against the stored hash, so it never fires for a real
-        # password — suspected bug, TECH-DEBT ledger candidate
+        # CHARACTERIZED → fixed 2026-10-08: guard now checks check_password(),
+        # rejecting reuse of the current password instead of comparing against
+        # the stored hash (which never matched a real password)
         from app.security import generate_password_reset_token
 
         token = generate_password_reset_token(regular_user.id)
@@ -948,18 +946,17 @@ class TestResetPassword:
             follow_redirects=True,
         )
         assert response.status_code == 200
-        assert b"Your password has been reset." in response.data
+        assert b"New password must be different" in response.data
+        assert b"Your password has been reset." not in response.data
         target = User.query.get(regular_user.id)
-        assert target.check_password("User@123456")
+        assert target.check_password("User@123456")  # unchanged
 
     def test_reset_password_hash_submitted_is_rejected_by_validators(
         self, client, app, regular_user
     ):
-        # CHARACTERIZED: the guard at app/routes/auth.py:264
-        # (`new_password.data == user.password_hash`) is unreachable for
-        # real accounts — scrypt hashes are 162 chars and the form caps
-        # new_password at 128, so validators reject the value before the
-        # comparison is ever evaluated — suspected bug, TECH-DEBT ledger candidate
+        # CHARACTERIZED: a stored scrypt hash (162 chars) still cannot be
+        # submitted — the form's 128-char cap rejects it via validators
+        # before the route guard (now check_password) is reached
         from app.security import generate_password_reset_token
 
         token = generate_password_reset_token(regular_user.id)

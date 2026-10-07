@@ -31,14 +31,12 @@ auth = Blueprint("auth", __name__)
 
 
 def _external_url(endpoint, **values):
-    """Build an absolute URL from the configured SERVER_NAME when available.
-
-    Prevents Host-header poisoning: the canonical host set by the operator wins
-    over the caller-controlled Host header. Falls back to the request host in
-    local development where SERVER_NAME is unset.
+    """Build an absolute URL. When SERVER_NAME is configured the operator's
+    canonical host wins over the caller-controlled Host header (Host-poisoning
+    guard); url_for builds the host from SERVER_NAME directly. In local
+    development where SERVER_NAME is unset it falls back to the request host.
     """
-    host = current_app.config.get("SERVER_NAME") or request.host
-    return url_for(endpoint, _external=True, _host=host, **values)
+    return url_for(endpoint, _external=True, **values)
 
 
 @auth.route("/login", methods=["GET", "POST"])
@@ -261,7 +259,7 @@ def reset_password(token):
 
     form = ResetPasswordForm()
     if form.validate_on_submit():
-        if form.new_password.data == user.password_hash:
+        if user.check_password(form.new_password.data):
             flash("New password must be different from your current password.",
                   "danger")
             return render_template("auth/reset_password.html", form=form, token=token)
