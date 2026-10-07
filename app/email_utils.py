@@ -1,5 +1,7 @@
+import contextlib
 import logging
 import smtplib
+import socket
 import threading
 
 from flask_mail import Mail, Message
@@ -10,6 +12,20 @@ mail = Mail()
 logger = logging.getLogger(__name__)
 
 _background_workers = set()
+
+
+@contextlib.contextmanager
+def _mail_timeout():
+    # ponytail: flask_mail's SMTP connect accepts no timeout (blocks
+    # forever by default); scope a socket default timeout around the send.
+    # Only SMTP sockets are opened inside this scope. Per-connection
+    # timeout needs replacing flask_mail.Connection.
+    old = socket.getdefaulttimeout()
+    try:
+        socket.setdefaulttimeout(current_app.config.get("MAIL_TIMEOUT", 10))
+        yield
+    finally:
+        socket.setdefaulttimeout(old)
 
 
 class MailSendError(Exception):
@@ -130,7 +146,8 @@ def send_email(to, subject, body, html=None, sender=None, async_=None):
             body=body,
             html=html,
         )
-        mail.send(msg)
+        with _mail_timeout():
+            mail.send(msg)
         logger.info("Email sent to %s from=%s subject=%r", to, from_addr, subject)
         return True
     except smtplib.SMTPAuthenticationError as exc:
@@ -181,7 +198,8 @@ def _send_in_background(app, from_addr, recipients, subject, body, html):
                 body=body,
                 html=html,
             )
-            mail.send(msg)
+            with _mail_timeout():
+                mail.send(msg)
         logger.info(
             "Email sent (async) to %s subject=%r", recipients, subject
         )

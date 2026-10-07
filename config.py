@@ -68,6 +68,7 @@ class Config:
     # Deliver email without blocking the request. False keeps sends
     # synchronous (used by tests and flows that need a result).
     MAIL_ASYNC = os.environ.get("MAIL_ASYNC", "false").lower() in ("true", "on", "1")
+    MAIL_TIMEOUT = int(os.environ.get("MAIL_TIMEOUT") or 10)
 
     # Account lockout
     LOGIN_MAX_ATTEMPTS = int(os.environ.get("LOGIN_MAX_ATTEMPTS", "5"))
