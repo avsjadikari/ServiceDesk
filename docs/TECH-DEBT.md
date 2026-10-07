@@ -23,11 +23,12 @@
 
 | Smell | Location | Refactoring | Status |
 |---|---|---|---|
-| Status-promote duplication `if status == "new": status = "assigned"` ×3 | `routes/tickets.py` new / edit / assign | Extract model helper, e.g. `Ticket.promote_status_if_new()` | Phase 3 |
-| Magic status/priority/type strings (bare `"new"`, `"in_progress"`, `"medium"` …) | `routes/tickets.py`, `models.py`, templates | Reference `app/enums.py` tuples (`TICKET_STATUSES`, `TICKET_PRIORITIES`, `TICKET_TYPES`) | Phase 3 (behavior-sensitive: DB CHECK constraints consume same values) |
-| Wrong docstring on `_can_view_ticket` (claims assignee can view; code checks creator only) | `routes/tickets.py:368` | Fix docstring or behavior — decide in Phase 3 | open |
-| Upload size branch ineffective (part-level Content-Length only; Flask 413 fires first) | `routes/tickets.py:416-419` | Covered in Debt Ledger row; revisit with LimitBytes/413 handling | open |
-| Sniff sample length bare literal `512` | `routes/tickets.py` upload_attachment | Name constant `SNIFF_LENGTH = 512` | trivial / skip |
+| Status-promote duplication `if status == "new": status = "assigned"` ×3 | `routes/tickets.py` new / edit / assign | Extract `Ticket.promote_status_if_new()` (handles None + "new") | **resolved 2026-10-08** (`4ae319d`, `9140c56`) |
+| Magic status/priority/type strings | `routes/tickets.py`, `models.py`, forms, templates | Stop using bare literals in logic; reference `app/enums.py` tuples | **resolved (routes+models)** `4ae319d`/`efcda2d` — board columns + SLA check + column defaults now enum-driven. Still inline: `forms.py` choice labels (no label data in enums), templates render status/priority strings passed from routes |
+| Wrong docstring on `_can_view_ticket` (claims assignee can view; code checks creator only) | `routes/tickets.py:368` | Fix docstring — assignees are always agents here, so no separate branch exists | **resolved 2026-10-08** (`9140c56`) — behavior unchanged |
+| Upload size branch ineffective (part-level Content-Length only; Flask 413 fires first) | `routes/tickets.py` upload_attachment | Revisit with `LimitBytes`/413 handling — robustness, belongs with Phase 7 (release-it) | **deferred → Phase 7** |
+| Sniff sample length bare literal `512` | `routes/tickets.py` upload_attachment | `SNIFF_LENGTH = 512` constant | **resolved 2026-10-08** (`9140c56`) |
+| Duplicated "rejected attachment" warning-log block ×2 | `routes/tickets.py` upload_attachment | Rule of Three: extract `_log_rejected_upload(...)` on 3rd occurrence | open (tolerated at 2) |
 | CRLF/LF mixed line endings | `tests/test_tickets.py` (pre-existing) | Normalize to LF if repo adopts a formatter | skip unless ruff added |
 
 ## Sprout / Wrap Register

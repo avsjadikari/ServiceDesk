@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | 1 — Build the safety net | working-with-legacy-code | done | TESTING.md + TECH-DEBT.md (GATE) | 2026-10-08 |
 | 2 — Make the code readable | clean-code | done | TECH-DEBT.md | 2026-10-08 |
-| 3 — Apply named refactorings | refactoring-patterns | pending | TECH-DEBT.md | |
+| 3 — Apply named refactorings | refactoring-patterns | done | TECH-DEBT.md | 2026-10-08 |
 | 4 — Reduce complexity | software-design-philosophy | pending | TECH-DEBT.md | |
 | 5 — Draw the architecture boundary | clean-architecture | pending | ARCHITECTURE.md | |
 | 6 — Lock in the habits | pragmatic-programmer | pending | TECH-DEBT.md | |
@@ -42,10 +42,13 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: <reas
 | 2026-10-08 | 2 | tickets.py audit ~6.7/10 → apply fixes 1-5 + int()/email behavior fixes now | Clear wins; user approved |
 | 2026-10-08 | 2 | Conventions: `_agent_users()`, guard clauses, `_to_int()`/`type=int`, no `pass`-dead branches, `_notify()` email guard; enums via `app/enums.py` tuples in new code | Reuse/applied; enum migration = Phase 3 |
 | 2026-10-08 | 2 | No CI gate now (structure+behavior commits kept separate) | Manual discipline still viable at 1 dev |
+| 2026-10-08 | 3 | Refactoring-patterns score (tickets.py): ~6.7 → 8/10; tuition: each step green-committed separately | Named refactorings: Move Method (`promote_status_if_new`), Extract Method (`_create_ticket`, `_apply_form_to_ticket`, `_apply_status_timestamps`), Replace Magic Number (`SNIFF_LENGTH`), enum-driven board columns |
+| 2026-10-08 | 3 | Phase 3 does NOT change behavior: defect fixes stay pinned+ledgered (unassign-resets-status, status whitelist) — those surface in Phase 6/7 hardening | Preserved φ arrow: structural change never mixed with behavioral change |
 
 ## Next Actions
 
 - [x] Phase 1 entry decision (agent + user, 2026-10-08)
 - [x] Phase 2 entry decision (clean-code, 2026-10-08)
-- [ ] Phase 3 entry decision (refactoring-patterns) — commit: apply Smell Inventory rows (status-promote helper, enum references), then revisit Name/Function/Comment class gaps
+- [x] Phase 3 entry decision (refactoring-patterns, 2026-10-08) — status-promote helper, enum constants, route decomposition, SNIFF_LENGTH, corrected docstring; 3 commits, 254 tests green each step
+- [ ] Phase 4 entry decision (software-design-philosophy) — tickets.py at 8/10; remaining: Long Method mostly dissolved, timestamps ifs, deferred upload-size robustness (Phase 7)
 - [ ] Optional: `sudo apt install python3.14-venv` to make `.venv` fully standard (user, any time)
