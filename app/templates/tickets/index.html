@@ -88,7 +88,7 @@
                         </span>
                     </td>
                     <td>{{ ticket.assignee.full_name if ticket.assignee else '-' }}</td>
-                    <td>{{ ticket.created_at.strftime('%m/%d %H:%M') }}</td>
+                    <td>{{ ticket.created_at|datetime_human('%m/%d %H:%M') }}</td>
                     <td>
                         {% if ticket.is_sla_breached %}
                         <span class="badge bg-danger"><i class="bi bi-clock-history me-1"></i>{{ _('Breached') }}</span>

@@ -29,6 +29,17 @@
                         <div class="form-text">{{ form.company_name.description }}</div>
                     </div>
 
+                    <div class="mb-3">
+                        {{ form.timezone.label(class="form-label") }}
+                        {{ form.timezone(class="form-select") }}
+                        {% if form.timezone.errors %}
+                            <div class="text-danger small mt-1">
+                                {% for error in form.timezone.errors %}{{ error }}{% endfor %}
+                            </div>
+                        {% endif %}
+                        <div class="form-text">{{ form.timezone.description }}</div>
+                    </div>
+
                     <div class="alert alert-info small mb-3">
                         <i class="bi bi-eye me-1"></i>
                         Current display name:
@@ -60,7 +71,7 @@
                         {% for entry in history %}
                         <tr>
                             <td class="small text-muted">
-                                {{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}
+                                {{ entry.created_at|datetime_human('%Y-%m-%d %H:%M') if entry.created_at else '' }}
                             </td>
                             <td>{{ entry.details.get('old', '-') if entry.details else '-' }}</td>
                             <td><strong>{{ entry.details.get('new', '-') if entry.details else '-' }}</strong></td>
@@ -281,7 +292,7 @@
                         {% for entry in mail_history %}
                         <tr>
                             <td class="small text-muted">
-                                {{ entry.created_at.strftime('%Y-%m-%d %H:%M') if entry.created_at else '' }}
+                                {{ entry.created_at|datetime_human('%Y-%m-%d %H:%M') if entry.created_at else '' }}
                             </td>
                             <td class="small">
                                 {% if entry.details %}

@@ -2,7 +2,8 @@ import os
 import logging
 import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from flask import (
     Flask,
@@ -197,6 +198,9 @@ def create_app(config_name=None):
     def _datetime_human_filter(value, fmt="%Y-%m-%d %H:%M"):
         if not value:
             return ""
+        zone = ZoneInfo(getattr(g, "app_timezone", "UTC") or "UTC")
+        if isinstance(value, datetime) and value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc).astimezone(zone)
         return value.strftime(fmt)
 
     from app.i18n import i18n_bp, load_translations, t, _, SUPPORTED_LANGUAGES
@@ -206,13 +210,21 @@ def create_app(config_name=None):
     @app.context_processor
     def inject_globals():
         try:
-            from app.settings_store import display_company_name
+            from app.settings_store import display_company_name, get_app_timezone
 
             brand = display_company_name()
+            tz_name = get_app_timezone()
+            try:
+                ZoneInfo(tz_name)
+            except Exception:  # defensively fall back if stored value is stale
+                tz_name = "UTC"
+            g.app_timezone = tz_name
         except Exception:  # pragma: no cover - defensive
             brand = app.config.get("COMPANY_NAME", "ServiceDesk")
+            g.app_timezone = "UTC"
         return dict(
             company_name=brand,
+            app_timezone=g.app_timezone,
             request_id=g.get("request_id"),
             now=datetime.utcnow,
             t=t,

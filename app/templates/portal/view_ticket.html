@@ -33,7 +33,7 @@
                 <div class="border-bottom pb-3 mb-3">
                     <div class="d-flex justify-content-between">
                         <strong>{{ comment.user.full_name }}</strong>
-                        <small class="text-muted">{{ comment.created_at.strftime('%m/%d/%Y %H:%M') }}</small>
+                        <small class="text-muted">{{ comment.created_at|datetime_human('%m/%d/%Y %H:%M') }}</small>
                     </div>
                     <p class="mb-0" style="white-space: pre-wrap;">{{ comment.content | markdown_safe }}</p>
                 </div>
@@ -89,19 +89,19 @@
                     </tr>
                     <tr>
                         <td><strong>Created</strong></td>
-                        <td>{{ ticket.created_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                        <td>{{ ticket.created_at|datetime_human('%m/%d/%Y %H:%M') }}</td>
                     </tr>
                     {% if ticket.resolved_at %}
                     <tr>
                         <td><strong>Resolved</strong></td>
-                        <td>{{ ticket.resolved_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                        <td>{{ ticket.resolved_at|datetime_human('%m/%d/%Y %H:%M') }}</td>
                     </tr>
                     {% endif %}
                     {% if ticket.sla_deadline %}
                     <tr>
                         <td><strong>Expected Resolution</strong></td>
                         <td class="{{ 'text-danger' if ticket.is_sla_breached else '' }}">
-                            {{ ticket.sla_deadline.strftime('%m/%d/%Y %H:%M') }}
+                            {{ ticket.sla_deadline|datetime_human('%m/%d/%Y %H:%M') }}
                             {% if ticket.is_sla_breached %}
                             <span class="badge bg-danger">Overdue</span>
                             {% endif %}

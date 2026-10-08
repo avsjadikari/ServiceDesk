@@ -42,7 +42,7 @@
                             {{ ticket.status }}
                         </span>
                     </td>
-                    <td>{{ ticket.created_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                    <td>{{ ticket.created_at|datetime_human('%m/%d/%Y %H:%M') }}</td>
                 </tr>
                 {% endfor %}
             </tbody>

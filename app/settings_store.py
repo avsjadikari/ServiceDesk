@@ -14,6 +14,8 @@ derived from the app's SECRET_KEY.
 """
 
 import hashlib
+from zoneinfo import ZoneInfo
+
 from flask import current_app
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
@@ -23,6 +25,9 @@ from app.models import SystemSetting
 COMPANY_NAME_KEY = "company_name"
 DEFAULT_COMPANY_NAME = "ServiceDesk"
 PRODUCT_SUFFIX = " ServiceDesk"
+
+APP_TIMEZONE_KEY = "app_timezone"
+DEFAULT_TIMEZONE = "UTC"
 
 
 MAIL_KEYS = {
@@ -136,6 +141,21 @@ def set_company_name(value, user_id=None):
     if not cleaned:
         raise ValueError("Company name cannot be empty")
     return set_setting(COMPANY_NAME_KEY, cleaned, user_id=user_id)
+
+
+def get_app_timezone():
+    """Return the stored display timezone (IANA name), defaulting to UTC."""
+    return get_setting(APP_TIMEZONE_KEY) or DEFAULT_TIMEZONE
+
+
+def set_app_timezone(value, user_id=None):
+    """Store the display timezone key. Rejects invalid IANA names."""
+    cleaned = (value or "").strip()
+    try:
+        ZoneInfo(cleaned)
+    except Exception as exc:
+        raise ValueError("Invalid timezone") from exc
+    return set_setting(APP_TIMEZONE_KEY, cleaned, user_id=user_id)
 
 
 def get_mail_config():

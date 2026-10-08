@@ -22,7 +22,7 @@
             <tbody>
                 {% for log in logs %}
                 <tr>
-                    <td>{{ log.created_at.strftime('%m/%d/%Y %H:%M:%S') }}</td>
+                    <td>{{ log.created_at|datetime_human('%m/%d/%Y %H:%M:%S') }}</td>
                     <td>{{ log.user.full_name if log.user else 'System' }}</td>
                     <td>
                         <span class="badge bg-{{ 'primary' if log.action in ['create', 'login', 'register'] else 'warning' if log.action in ['update', 'status_change'] else 'info' }}">

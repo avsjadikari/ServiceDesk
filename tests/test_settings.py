@@ -1,4 +1,4 @@
-"""Tests for the system settings (company-name branding)."""
+"""Tests for the system settings (company-name branding + timezone)."""
 
 import pytest
 
@@ -11,10 +11,12 @@ def fresh_settings(db):
     test starts from a known baseline."""
     SystemSetting.query.delete()
     AuditLog.query.filter_by(action="update_company_name").delete()
+    AuditLog.query.filter_by(action="update_timezone").delete()
     db.session.commit()
     yield
     SystemSetting.query.delete()
     AuditLog.query.filter_by(action="update_company_name").delete()
+    AuditLog.query.filter_by(action="update_timezone").delete()
     db.session.commit()
 
 
@@ -383,6 +385,97 @@ class TestMailSettings:
         assert mask_secret("") == ""
         assert mask_secret("ab") == "••"
         assert mask_secret("abcdef") == "ab••ef"
+
+
+class TestTimezoneSetting:
+    """Timezone is stored as an IANA name and applied at render time."""
+
+    def test_defaults_to_utc(self, app, fresh_settings):
+        from app.settings_store import get_app_timezone
+
+        with app.app_context():
+            assert get_app_timezone() == "UTC"
+
+    def test_set_and_get_roundtrip(self, app, fresh_settings):
+        from app.settings_store import get_app_timezone, set_app_timezone
+
+        with app.app_context():
+            set_app_timezone("Asia/Colombo")
+            assert get_app_timezone() == "Asia/Colombo"
+
+    def test_invalid_timezone_rejected(self, app, fresh_settings):
+        from app.settings_store import get_app_timezone, set_app_timezone
+
+        with app.app_context():
+            with pytest.raises(ValueError):
+                set_app_timezone("Mars/Olympus")
+            assert get_app_timezone() == "UTC"
+
+    def test_admin_can_save_timezone(self, client, app, db, admin_user):
+        from app.settings_store import get_app_timezone
+
+        with app.app_context():
+            client.post(
+                "/login",
+                data={"username": "admin", "password": "Admin@123456"},
+            )
+            response = client.post(
+                "/settings/",
+                data={"company_name": "ServiceDesk", "timezone": "Asia/Colombo"},
+            )
+            assert response.status_code == 302
+            assert get_app_timezone() == "Asia/Colombo"
+
+            entries = AuditLog.query.filter_by(action="update_timezone").all()
+            assert len(entries) == 1
+            assert entries[0].details == {"old": "UTC", "new": "Asia/Colombo"}
+
+    def test_settings_page_renders_selected_timezone(
+        self, client, app, admin_user, fresh_settings
+    ):
+        with app.app_context():
+            client.post(
+                "/login",
+                data={"username": "admin", "password": "Admin@123456"},
+            )
+            client.post(
+                "/settings/",
+                data={"company_name": "ServiceDesk", "timezone": "Asia/Colombo"},
+            )
+            response = client.get("/settings/")
+            assert response.status_code == 200
+            assert b'selected' in response.data
+
+
+class TestTimezoneAppliedToDisplay:
+    """The datetime_human filter shifts naive (UTC) values into the
+    configured zone; date-only values pass through untouched."""
+
+    def test_filter_shifts_to_configured_zone(self, app, fresh_settings):
+        from datetime import datetime
+
+        from flask import g
+
+        from app.settings_store import set_app_timezone
+
+        with app.app_context():
+            set_app_timezone("Asia/Colombo")
+            g.app_timezone = "Asia/Colombo"
+            stamp = datetime(2026, 1, 1, 0, 30)
+            rendered = app.jinja_env.filters["datetime_human"](
+                stamp, "%Y-%m-%d %H:%M"
+            )
+            assert rendered == "2026-01-01 06:00"
+
+    def test_filter_uses_utc_when_unset(self, app, fresh_settings):
+        from datetime import datetime
+
+        with app.app_context():
+            stamp = datetime(2026, 1, 1, 0, 30)
+            rendered = app.jinja_env.filters["datetime_human"](
+                stamp, "%Y-%m-%d %H:%M"
+            )
+            assert rendered == "2026-01-01 00:30"
 
     def test_send_email_falls_back_to_username(
         self, client, app, db, admin_user, fresh_settings

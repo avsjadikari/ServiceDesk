@@ -395,6 +395,31 @@ class SystemSettingsForm(FlaskForm):
             "Displayed as \"<value> ServiceDesk\" on every page and dashboard."
         ),
     )
+    timezone = SelectField(
+        "Timezone",
+        choices=[
+            ("UTC", "UTC"),
+            ("America/New_York", "Eastern (US)"),
+            ("America/Chicago", "Central (US)"),
+            ("America/Denver", "Mountain (US)"),
+            ("America/Los_Angeles", "Pacific (US)"),
+            ("Europe/London", "London"),
+            ("Europe/Paris", "Paris"),
+            ("Europe/Berlin", "Berlin"),
+            ("Europe/Moscow", "Moscow"),
+            ("Asia/Dubai", "Dubai"),
+            ("Asia/Kolkata", "Colombo / New Delhi"),
+            ("Asia/Colombo", "Colombo"),
+            ("Asia/Singapore", "Singapore"),
+            ("Asia/Tokyo", "Tokyo"),
+            ("Asia/Shanghai", "Shanghai"),
+            ("Australia/Sydney", "Sydney"),
+            ("Pacific/Auckland", "Auckland"),
+        ],
+        description=(
+            "All dates and times across the app are shown in this timezone."
+        ),
+    )
 
 
 class MailSettingsForm(FlaskForm):

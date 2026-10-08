@@ -14,10 +14,12 @@ from app.forms import MailSettingsForm, SystemSettingsForm, TestEmailForm
 from app.models import AuditLog
 from app.settings_store import (
     apply_mail_config,
+    get_app_timezone,
     get_company_name,
     get_mail_config,
     mail_is_configured,
     mask_secret,
+    set_app_timezone,
     set_company_name,
     set_mail_config,
 )
@@ -70,12 +72,18 @@ def index():
         flash("Only administrators can change system settings.", "danger")
         return redirect(url_for("main.dashboard"))
 
-    form = SystemSettingsForm(data={"company_name": get_company_name()})
+    form = SystemSettingsForm(
+        data={"company_name": get_company_name(), "timezone": get_app_timezone()}
+    )
     if form.validate_on_submit():
         try:
             new_name = (form.company_name.data or "").strip()
             old_name = get_company_name()
             set_company_name(new_name, user_id=current_user.id)
+            new_tz = form.timezone.data
+            old_tz = get_app_timezone()
+            if new_tz and new_tz != old_tz:
+                set_app_timezone(new_tz, user_id=current_user.id)
         except ValueError as exc:
             flash(str(exc), "danger")
             mail_cfg = get_mail_config()
@@ -97,6 +105,13 @@ def index():
             "system_setting",
             details={"old": old_name, "new": new_name},
         )
+        if new_tz and new_tz != old_tz:
+            log_audit(
+                current_user.id,
+                "update_timezone",
+                "system_setting",
+                details={"old": old_tz, "new": new_tz},
+            )
         current_app.logger.info(
             "Company name updated user_id=%s new=%r",
             current_user.id,
@@ -272,7 +287,9 @@ def _build_test_email_form():
 
 
 def _render_settings():
-    form = SystemSettingsForm(data={"company_name": get_company_name()})
+    form = SystemSettingsForm(
+        data={"company_name": get_company_name(), "timezone": get_app_timezone()}
+    )
     mail_cfg = get_mail_config()
     return render_template(
         "settings/index.html",

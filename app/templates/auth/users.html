@@ -49,7 +49,7 @@
                                 Locked
                                 {% if user.locked_until %}
                                 <span class="small">
-                                    until {{ user.locked_until.strftime('%Y-%m-%d %H:%M') }}
+                                    until {{ user.locked_until|datetime_human('%Y-%m-%d %H:%M') }}
                                 </span>
                                 {% endif %}
                             </span>

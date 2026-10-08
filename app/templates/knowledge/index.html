@@ -54,7 +54,7 @@
                 <small>
                     <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
                     <span class="mx-2">|</span>
-                    <i class="bi bi-clock me-1"></i>{{ article.updated_at.strftime('%m/%d/%Y') }}
+                    <i class="bi bi-clock me-1"></i>{{ article.updated_at|datetime_human('%m/%d/%Y') }}
                 </small>
             </div>
         </div>

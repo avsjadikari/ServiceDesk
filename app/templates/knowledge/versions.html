@@ -21,7 +21,7 @@
                 {% for version in versions %}
                 <tr>
                     <td>v{{ version.version }}</td>
-                    <td>{{ version.created_at.strftime('%m/%d/%Y %H:%M') }}</td>
+                    <td>{{ version.created_at|datetime_human('%m/%d/%Y %H:%M') }}</td>
                     <td>
                         <button class="btn btn-sm btn-outline-primary" data-bs-toggle="modal" data-bs-target="#versionModal{{ version.id }}">
                             View

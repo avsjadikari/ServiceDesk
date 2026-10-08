@@ -170,7 +170,7 @@
                                 <span class="badge bg-danger"><i class="bi bi-clock-history me-1"></i>{{ _('Breached') }}</span>
                                 {% elif ticket.sla_deadline %}
                                 <span class="badge badge-soft badge-soft-warning">
-                                    {{ ticket.sla_deadline.strftime('%m/%d %H:%M') }}
+                                    {{ ticket.sla_deadline|datetime_human('%m/%d %H:%M') }}
                                 </span>
                                 {% else %}
                                 <span class="text-muted small">-</span>
@@ -222,7 +222,7 @@
                                 </span>
                             </td>
                             <td>
-                                <small class="text-muted">{{ ticket.created_at.strftime('%m/%d %H:%M') }}</small>
+                                <small class="text-muted">{{ ticket.created_at|datetime_human('%m/%d %H:%M') }}</small>
                             </td>
                         </tr>
                         {% endfor %}
