@@ -323,6 +323,19 @@ class TestKnowledgeCharacterization:
         with app.app_context():
             assert Article.query.get(aid).helpful_count == 1
 
+    def test_helpful_dismiss_does_not_increment(self, client, app, db, admin_user, regular_user):
+        """Honest-feedback: vote=dismiss keeps the count a strict yes-tally."""
+        with app.app_context():
+            a = Article(title="H1", content="c", category="Hardware", author_id=admin_user.id, status="published", helpful_count=0)
+            db.session.add(a)
+            db.session.commit()
+            aid = a.id
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+        resp = client.post(f"/knowledge/{aid}/helpful", data={"vote": "dismiss"}, follow_redirects=False)
+        assert resp.status_code == 302
+        with app.app_context():
+            assert Article.query.get(aid).helpful_count == 0
+
     def test_helpful_anonymous_redirects_to_login(self, client, app, db, admin_user):
         """@login_required on helpful: anonymous -> 302 login."""
         with app.app_context():

@@ -48,7 +48,13 @@
             </div>
             <div class="card-footer text-muted">
                 <small>
+                    <i class="bi bi-person me-1"></i>{{ article.author.full_name }}
+                    <span class="mx-2">|</span>
                     <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
+                    {% if article.helpful_count %}
+                    <span class="mx-2">|</span>
+                    <i class="bi bi-hand-thumbs-up me-1"></i>{{ article.helpful_count }} found this helpful
+                    {% endif %}
                 </small>
             </div>
         </div>

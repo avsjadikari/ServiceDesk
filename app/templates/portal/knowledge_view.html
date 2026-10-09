@@ -15,6 +15,10 @@
         <small>
             <span class="badge bg-secondary">{{ article.category }}</span>
             <span class="mx-2">|</span>
+            <i class="bi bi-person me-1"></i>Written by {{ article.author.full_name }}
+            <span class="mx-2">|</span>
+            <i class="bi bi-clock me-1"></i>Updated {{ article.updated_at|datetime_human('%m/%d/%Y %H:%M') }}
+            <span class="mx-2">|</span>
             <i class="bi bi-eye me-1"></i>{{ article.view_count }} views
         </small>
     </div>
@@ -22,13 +26,16 @@
 
 <div class="card">
     <div class="card-header">
-        <h5 class="mb-0">Was this article helpful?</h5>
+        <h5 class="mb-0">Did this article help you?</h5>
     </div>
     <div class="card-body">
         <form method="POST" action="{{ url_for('knowledge.helpful', article_id=article.id) }}">
             <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-            <button type="submit" class="btn btn-outline-success">
-                <i class="bi bi-hand-thumbs-up me-1"></i>Yes, it helped
+            <button type="submit" name="vote" value="helpful" class="btn btn-outline-success">
+                <i class="bi bi-hand-thumbs-up me-1"></i>It helped me
+            </button>
+            <button type="submit" name="vote" value="dismiss" class="btn btn-outline-secondary">
+                Not for me
             </button>
         </form>
     </div>

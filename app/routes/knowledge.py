@@ -153,7 +153,8 @@ def versions(article_id):
 @login_required
 def helpful(article_id):
     article = Article.query.get_or_404(article_id)
-    article.helpful_count += 1
+    if request.form.get("vote") != "dismiss":
+        article.helpful_count += 1
     db.session.commit()
     flash("Thank you for your feedback!", "success")
     return redirect(url_for("knowledge.view", article_id=article_id))
