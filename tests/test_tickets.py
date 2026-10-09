@@ -838,7 +838,7 @@ class TestUpdateStatusBranches:
                 follow_redirects=True,
             )
             assert response.status_code == 200
-            assert b"Ticket status updated to resolved." in response.data
+            assert b"Ticket status updated to Resolved." in response.data
 
             ticket = Ticket.query.get(ticket.id)
             assert ticket.status == "resolved"
@@ -1551,6 +1551,66 @@ class TestEmailSendGuards:
                 response = client.post(
                     f"/tickets/{ticket.id}/comment",
                     data={"content": "a note"},
-                )
+)
             assert response.status_code == 302
             assert Comment.query.filter_by(ticket_id=ticket.id).count() == 1
+
+
+class TestErrorFeedback:
+    """K4/K5/K6: silent-failure and no-undo paths on the agent workflow."""
+
+    def _make_ticket(self, db, created_by):
+        ticket = Ticket(
+            ticket_number="TKT-300001",
+            title="Feedback test",
+            description="d",
+            created_by=created_by,
+            type="incident",
+            priority="medium",
+            category="Hardware",
+        )
+        db.session.add(ticket)
+        db.session.commit()
+        return ticket
+
+    def test_empty_comment_flashes_error(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = self._make_ticket(db, admin_user.id)
+
+            response = client.post(
+                f"/tickets/{ticket.id}/comment",
+                data={"content": "  "},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Comment cannot be empty." in response.data
+            assert Comment.query.filter_by(ticket_id=ticket.id).count() == 0
+
+    def test_edit_empty_title_shows_field_error(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = self._make_ticket(db, admin_user.id)
+
+            response = client.post(
+                f"/tickets/{ticket.id}/edit",
+                data={
+                    "title": "",
+                    "description": "",
+                    "type": "incident",
+                    "priority": "medium",
+                    "category": "Hardware",
+                },
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"This field is required." in response.data
+
+    def test_status_and_assign_require_explicit_apply(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = self._make_ticket(db, admin_user.id)
+
+            response = client.get(f"/tickets/{ticket.id}")
+            assert b"onchange" not in response.data
+            assert response.data.count(b"Apply") == 2

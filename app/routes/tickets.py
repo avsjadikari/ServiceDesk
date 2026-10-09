@@ -59,6 +59,16 @@ def _notify(ticket, description, send_fn, *args):
         )
 
 
+STATUS_LABELS = {
+    "new": "New",
+    "assigned": "Assigned",
+    "in_progress": "In Progress",
+    "pending": "Pending",
+    "resolved": "Resolved",
+    "closed": "Closed",
+}
+
+
 def _apply_status_timestamps(ticket, new_status):
     if new_status == "in_progress" and not ticket.first_response_at:
         ticket.first_response_at = datetime.utcnow()
@@ -281,7 +291,7 @@ def update_status(ticket_id):
     if request.is_json:
         return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
 
-    flash(f"Ticket status updated to {new_status}.", "success")
+    flash(f"Ticket status updated to {STATUS_LABELS.get(new_status, new_status)}.", "success")
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
@@ -354,6 +364,8 @@ def add_comment(ticket_id):
         _notify(ticket, "comment", send_ticket_comment, comment)
 
         flash("Comment added successfully.", "success")
+    else:
+        flash("Comment cannot be empty.", "danger")
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 

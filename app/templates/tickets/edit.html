@@ -15,6 +15,11 @@
             <div class="mb-3">
                 {{ form.title.label(class="form-label") }}
                 {{ form.title(class="form-control") }}
+                {% if form.title.errors %}
+                    <div class="text-danger">
+                        {% for error in form.title.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
             </div>
             
             <div class="row">
@@ -37,6 +42,11 @@
             <div class="mb-3">
                 {{ form.description.label(class="form-label") }}
                 {{ form.description(class="form-control", rows="6") }}
+                {% if form.description.errors %}
+                    <div class="text-danger">
+                        {% for error in form.description.errors %}{{ error }}{% endfor %}
+                    </div>
+                {% endif %}
             </div>
             
             <div class="mb-3">
