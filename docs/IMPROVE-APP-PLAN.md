@@ -20,10 +20,9 @@
 | 1 — Re-anchor on the job | jobs-to-be-done | done | CUSTOMER.md (GATE) | 2026-10-09 |
 | 2 — Remove friction | ux-heuristics | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 3 — Design out errors | design-everyday-things | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
-| 4 — Make it delightful | microinteractions | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 4 — Look as clear as it works | refactoring-ui | pending | DESIGN.md + EXPERIMENTS.md | |
-| 5 — Make actions feel alive | microinteractions | pending | DESIGN.md + EXPERIMENTS.md | |
-| 6 — Sharpen the words | made-to-stick | pending | POSITIONING.md + EXPERIMENTS.md | |
+| 5 — Make actions feel alive | microinteractions | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
+| 6 — Sharpen the words | made-to-stick | done | POSITIONING.md + EXPERIMENTS.md | 2026-10-09 |
 | 7 — Persuade honestly | influence-psychology | pending | POSITIONING.md + EXPERIMENTS.md | |
 | 8 — Feel fast where touched | high-perf-browser | pending | DESIGN.md + EXPERIMENTS.md | |
 | 9 — Brutal end-to-end review | steve-jobs-design-review | pending | PRODUCT.md + DESIGN.md + EXPERIMENTS.md | |
@@ -45,13 +44,16 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: reaso
 | 2026-10-09 | 1 | **Emotional dimension declared worst (decision 2)** — relief/reassurance is the underdelivered hire; functional works, social has a reference number | Sets Phase 2-3 target: reassurance + feedback, not form logic |
 | 2026-10-09 | 1 | Leak = **Little Hire** (decision 3) — daily submission/status loop, not adoption | Internal tool: no acquisition problem; complaints sit in the daily agent workflow |
 | 2026-10-09 | 1 | No product docs existed → create each file at phase exit from the skeleton | Artifact discipline: extend, never create until named |
+| 2026-10-09 | 6 | Copy = reassurance channel first (emails/empty states), not landing-page polish; emotional hire from Phase 1 | All five copy surfaces shipped after diagnostic 4/10 showed Emotional=3/10 |
+| 2026-10-09 | 6 | Fixed `_notify` ticket-arg bug — all ticket emails silently dead | Phase 6 audit surfaced it; emails are the reassurance channel |
 
 ## Next Actions
 
 - [x] Phase 1 (GATE, 2026-10-09): done — CUSTOMER.md (job statement, dimensions, forces, hire moments, alternatives). Journey target set: **emotional dimension + Little Hire** → daily loop reassurance.
 - [x] Phase 3 (2026-10-09): done — K1/K4/K5/K6 shipped (explicit Apply, error feedback, human labels). DESIGN.md 5/10→7/10.
-- [x] Phase 4 (2026-10-09): done — M1 submit-guard shipped (double-submit + loading state).
 - [x] Phase 2 (2026-10-09): done — U1/U2/U3 shipped (ticket search, you-are-here, filter labels).
-- [ ] Phase 5 entry decision (made-to-stick): audit end-user reassurance copy (confirmation, SLA, empty states) against SUCCESs; rewrite weak spots.
+- [x] Phase 5 (microinteractions, 2026-10-09): done — M1 submit-guard shipped (double-submit + loading state).
+- [x] Phase 6 (made-to-stick, 2026-10-09): done — reassurance copy set + POSITIONING.md; fixed dead email path (`_notify` never passed `ticket`) + portal now sends created email.
+- [ ] Phase 7 entry decision (persuade honestly): audit badge/count/praise claims for accuracy before any polish.
 - [ ] Every shipped change lands in EXPERIMENTS.md with a pre-committed metric.
 - [ ] Optional: continuous-discovery if the audit needs weekly user contact rather than current evidence.

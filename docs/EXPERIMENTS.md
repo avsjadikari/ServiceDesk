@@ -25,6 +25,14 @@ Every shipped change carries a pre-committed metric. Measured before/after; judg
 - **Metric:** share of index views that carry `q` (findability pain proxy). Baseline 0 (feature new). Target: plateau above 5% = search adopted by agents in the daily loop.
 - **Window:** 2 weeks. Judge with U2/U3 (nav highlight, filter labels) against complaints channel.
 
+## Reassurance copy (Phase 6, made-to-stick)
+
+- **Shipped:** 2026-10-09 — created/status emails rewritten to handover + plain-language gloss; portal empty states, submission flash now name the deadline; Fixed latent bug: `_notify` never passed `ticket`, so ALL ticket emails silently never sent; portal submission now sends the created email.
+- Against SUCCESs (Quick Diagnostic ~23/60 → target ≥35/60): Simple/Concrete via deadline + track link; Credible via honest deadline + "we'll tell you why"; Emotional via handover framing; no Unexpected/Stories forced on transactional mail.
+- **Metric:** creator visits the portal ticket within 24h of a status email (reassurance = proof check-in). Measured from `TicketAudit`/page access signals; baseline 0 (emails were dead). Target: ≥30%.
+- **Outcome metric (2 wk):** resolved-ticket reopen rate (<7d) — confidence that "resolved" reads as real, not silence.
+- **Judge with:** complaints channel + reopen-rate before/after.
+
 ## Submit-guard (M1)
 
 - **Shipped:** 2026-10-09 — all form submits disable + spinner (`main.js:initSubmitGuards`); board "Save & move" disabled until settle.
