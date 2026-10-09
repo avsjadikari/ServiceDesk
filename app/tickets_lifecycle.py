@@ -8,20 +8,20 @@ instead of re-deriving timestamp/audit/notify rules per surface.
 """
 
 from app import db, email_utils
-from app.models import Comment
+from app.models import Comment, Ticket
 from app.utils import apply_automation_rules, build_ticket, log_ticket_audit
 
 
 def create_ticket(
     *,
-    title,
-    description,
-    ticket_type,
-    priority,
-    category,
-    created_by_id,
-    assigned_to=None,
-):
+    title: str,
+    description: str,
+    ticket_type: str,
+    priority: str,
+    category: str,
+    created_by_id: int,
+    assigned_to: int | None = None,
+) -> Ticket:
     """Build, persist, audit, run creation automation, and notify. Returns
     the saved ticket (flushed, not committed)."""
     ticket = build_ticket(
@@ -42,7 +42,7 @@ def create_ticket(
     return ticket
 
 
-def change_status(ticket, new_status):
+def change_status(ticket: Ticket, new_status: str) -> Ticket:
     """Apply a status transition: set status, stamp timestamps, audit, notify."""
     old_status = ticket.status
     ticket.status = new_status
@@ -59,7 +59,7 @@ def change_status(ticket, new_status):
     return ticket
 
 
-def assign_ticket(ticket, assignee_id):
+def assign_ticket(ticket: Ticket, assignee_id: int) -> Ticket:
     """Assign an agent (promoting a new ticket to assigned), audit, notify."""
     ticket.assigned_to = assignee_id
     ticket.promote_status_if_new()
@@ -72,7 +72,9 @@ def assign_ticket(ticket, assignee_id):
     return ticket
 
 
-def add_comment(ticket, content, is_internal, user_id):
+def add_comment(
+    ticket: Ticket, content: str, is_internal: bool, user_id: int
+) -> Comment:
     """Persist a comment on a ticket, audit it, and notify watchers."""
     comment = Comment(
         ticket_id=ticket.id,

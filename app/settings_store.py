@@ -13,14 +13,20 @@ Mail passwords are encrypted at rest using Fernet (symmetric encryption)
 derived from the app's SECRET_KEY.
 """
 
+from __future__ import annotations
+
 import hashlib
+from typing import TYPE_CHECKING
 from zoneinfo import ZoneInfo
 
-from flask import current_app
+from flask import Flask, current_app
 from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app import db
 from app.models import SystemSetting
+
+if TYPE_CHECKING:
+    from cryptography.fernet import Fernet
 
 COMPANY_NAME_KEY = "company_name"
 DEFAULT_COMPANY_NAME = "ServiceDesk"
@@ -40,7 +46,7 @@ MAIL_KEYS = {
 }
 
 
-def _get_fernet():
+def _get_fernet() -> Fernet:
     """Return a Fernet instance derived from the app's SECRET_KEY."""
     from cryptography.fernet import Fernet
 
@@ -49,7 +55,7 @@ def _get_fernet():
     return Fernet(__import__("base64").urlsafe_b64encode(key))
 
 
-def _is_fernet_encrypted(value):
+def _is_fernet_encrypted(value: str | None) -> bool:
     """Check if a value looks like a Fernet token."""
     if not value or not isinstance(value, str):
         return False
@@ -61,14 +67,14 @@ def _is_fernet_encrypted(value):
         return False
 
 
-def _encrypt_value(value):
+def _encrypt_value(value: str | None) -> str | None:
     """Encrypt a plaintext value for storage."""
     if not value:
         return value
     return _get_fernet().encrypt(value.encode()).decode()
 
 
-def _decrypt_value(value):
+def _decrypt_value(value: str | None) -> str | None:
     """Decrypt a stored Fernet token. Returns plaintext."""
     if not value:
         return value
@@ -77,7 +83,7 @@ def _decrypt_value(value):
     return value
 
 
-def get_setting(key, default=None):
+def get_setting(key: str, default: str | None = None) -> str | None:
     """Read a setting from the DB; fall back to ``default`` if missing or
     if the table doesn't exist yet (e.g. mid-setup)."""
     try:
@@ -89,7 +95,9 @@ def get_setting(key, default=None):
     return row.value
 
 
-def set_setting(key, value, user_id=None):
+def set_setting(
+    key: str, value: str, user_id: int | None = None
+) -> SystemSetting:
     """Insert or update a setting."""
     row = SystemSetting.query.filter_by(key=key).first()
     if row is None:
@@ -102,7 +110,7 @@ def set_setting(key, value, user_id=None):
     return row
 
 
-def delete_setting(key):
+def delete_setting(key: str) -> SystemSetting | None:
     """Remove a setting (revert to env-var default)."""
     row = SystemSetting.query.filter_by(key=key).first()
     if row is not None:
@@ -111,7 +119,7 @@ def delete_setting(key):
     return row
 
 
-def get_company_name():
+def get_company_name() -> str:
     """Return the raw stored company name (no suffix).
 
     Falls back to ``COMPANY_NAME`` env var or ``DEFAULT_COMPANY_NAME``.
@@ -122,7 +130,7 @@ def get_company_name():
     return current_app.config.get("COMPANY_NAME") or DEFAULT_COMPANY_NAME
 
 
-def display_company_name():
+def display_company_name() -> str:
     """Return the full brand string used in every UI surface.
 
     The stored company name is concatenated with ``PRODUCT_SUFFIX`` so
@@ -137,7 +145,7 @@ def display_company_name():
     return f"{raw}{PRODUCT_SUFFIX}"
 
 
-def set_company_name(value, user_id=None):
+def set_company_name(value: str | None, user_id: int | None = None) -> SystemSetting:
     """Store the raw company name (suffix is added on display)."""
     cleaned = (value or "").strip()
     if not cleaned:
@@ -145,12 +153,12 @@ def set_company_name(value, user_id=None):
     return set_setting(COMPANY_NAME_KEY, cleaned, user_id=user_id)
 
 
-def get_app_timezone():
+def get_app_timezone() -> str:
     """Return the stored display timezone (IANA name), defaulting to UTC."""
     return get_setting(APP_TIMEZONE_KEY) or DEFAULT_TIMEZONE
 
 
-def set_app_timezone(value, user_id=None):
+def set_app_timezone(value: str | None, user_id: int | None = None) -> SystemSetting:
     """Store the display timezone key. Rejects invalid IANA names."""
     cleaned = (value or "").strip()
     try:
@@ -160,7 +168,7 @@ def set_app_timezone(value, user_id=None):
     return set_setting(APP_TIMEZONE_KEY, cleaned, user_id=user_id)
 
 
-def get_mail_config():
+def get_mail_config() -> dict:
     """Return the effective mail server config, merging DB overrides on
     top of the Flask config (which itself reads env vars)."""
     cfg = {
@@ -200,13 +208,13 @@ def get_mail_config():
     return cfg
 
 
-def mail_is_configured():
+def mail_is_configured() -> bool:
     """True when both a server and a username have been set."""
     cfg = get_mail_config()
     return bool(cfg.get("MAIL_SERVER") and cfg.get("MAIL_USERNAME"))
 
 
-def apply_mail_config(app):
+def apply_mail_config(app: Flask) -> None:
     """Push the merged mail config onto ``app.config``.
 
     Should be called once at app start, and again after the admin saves
@@ -221,23 +229,23 @@ def apply_mail_config(app):
     app.config["MAIL_DEFAULT_SENDER"] = cfg["MAIL_DEFAULT_SENDER"]
 
 
-def set_mail_config(values, user_id=None):
+def set_mail_config(values: dict, user_id: int | None = None) -> None:
     """Persist a dict of mail settings; missing keys are left alone."""
     for setting_key, value in values.items():
         if setting_key not in MAIL_KEYS:
             continue
         if value in (None, ""):
             delete_setting(MAIL_KEYS[setting_key])
-        else:
-            if setting_key == "mail_password":
-                try:
-                    value = _encrypt_value(str(value))
-                except Exception:
-                    value = str(value)
-            set_setting(MAIL_KEYS[setting_key], str(value), user_id=user_id)
+            continue
+        if setting_key == "mail_password":
+            try:
+                value = _encrypt_value(str(value))
+            except Exception:
+                value = str(value)
+        set_setting(MAIL_KEYS[setting_key], str(value), user_id=user_id)
 
 
-def mask_secret(value):
+def mask_secret(value: str | None) -> str:
     """Return ``value`` with most characters replaced for display."""
     if not value:
         return ""

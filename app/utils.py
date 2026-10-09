@@ -15,7 +15,7 @@ from app.models import Ticket, AuditLog, User
 # rules, presentation colors, dashboard metrics, and upload sniff validation.
 
 
-def generate_ticket_number():
+def generate_ticket_number() -> str:
     last_ticket = Ticket.query.order_by(Ticket.id.desc()).first()
     if last_ticket:
         last_num = int(last_ticket.ticket_number.split("-")[1])
@@ -26,16 +26,16 @@ def generate_ticket_number():
 
 
 def build_ticket(
-    title,
-    description,
-    ticket_type,
-    priority,
-    category,
-    created_by_id,
-    assigned_to=None,
-    sla_config=None,
-    now=None,
-):
+    title: str,
+    description: str,
+    ticket_type: str,
+    priority: str,
+    category: str,
+    created_by_id: int,
+    assigned_to: int | None = None,
+    sla_config: dict | None = None,
+    now: datetime | None = None,
+) -> Ticket:
     """Construct an unsaved Ticket: auto-number, SLA deadline from priority,
     and promote-to-assigned when an assignee is given. Shared by the agent,
     portal, and API creation flows so the mapping lives in one place."""
@@ -57,7 +57,9 @@ def build_ticket(
     return ticket
 
 
-def calculate_sla_deadline(priority, sla_config=None, now=None):
+def calculate_sla_deadline(
+    priority: str, sla_config: dict | None = None, now: datetime | None = None
+) -> datetime:
     """SLA deadline for a priority. Domain-pure: pass sla_config + now to
     test without app context; defaults read the Flask config."""
     sla_config = (
@@ -72,22 +74,22 @@ def calculate_sla_deadline(priority, sla_config=None, now=None):
     return now + timedelta(hours=24)
 
 
-def _client_ip():
+def _client_ip() -> str | None:
     if not has_request_context():
         return None
     return request.headers.get("X-Forwarded-For", request.remote_addr)
 
 
 def log_audit(
-    user_id,
-    action,
-    entity_type=None,
-    entity_id=None,
-    ticket_id=None,
-    details=None,
-    ip_address=None,
-    commit=True,
-):
+    user_id: int | None,
+    action: str,
+    entity_type: str | None = None,
+    entity_id: int | None = None,
+    ticket_id: int | None = None,
+    details: dict | None = None,
+    ip_address: str | None = None,
+    commit: bool = True,
+) -> None:
     """Add an AuditLog row. By default commits; pass commit=False when the
     caller wants the audit row to share the surrounding transaction."""
     log = AuditLog(
@@ -104,7 +106,9 @@ def log_audit(
         db.session.commit()
 
 
-def log_ticket_audit(ticket, action, details=None, commit=True):
+def log_ticket_audit(
+    ticket: Ticket, action: str, details: dict | None = None, commit: bool = True
+) -> None:
     """Record an audit event for a ticket. A ticket row always maps the
     same way (entity_type="ticket", entity_id=ticket.id, ticket_id=ticket.id),
     so that decision lives here instead of each route."""
@@ -119,7 +123,9 @@ def log_ticket_audit(ticket, action, details=None, commit=True):
     )
 
 
-def apply_automation_rules(ticket, trigger_type, commit=True):
+def apply_automation_rules(
+    ticket: Ticket, trigger_type: str, commit: bool = True
+) -> None:
     from app.models import AutomationRule
 
     rules = (
@@ -132,34 +138,29 @@ def apply_automation_rules(ticket, trigger_type, commit=True):
         _execute_automation_rule(ticket, rule, commit)
 
 
-def _execute_automation_rule(ticket, rule, commit=True):
+def _execute_automation_rule(ticket: Ticket, rule, commit: bool = True) -> None:
     if rule.action_type == "assign":
-        if rule.action_config and "assign_to" in rule.action_config:
-            assignee_id = rule.action_config["assign_to"]
-            assignee = User.query.get(assignee_id)
-            if assignee:
-                ticket.assigned_to = assignee_id
-                ticket.promote_status_if_new()
-                if commit:
-                    db.session.commit()
-
-    elif rule.action_type == "notify":
-        pass
-
+        assignee_id = (rule.action_config or {}).get("assign_to")
+        if not assignee_id or not User.query.get(assignee_id):
+            return
+        ticket.assigned_to = assignee_id
+        ticket.promote_status_if_new()
+        if commit:
+            db.session.commit()
     elif rule.action_type == "escalate":
-        if ticket.priority in ["high", "critical"]:
+        if ticket.priority in ("high", "critical"):
             ticket.priority = "critical"
             if commit:
                 db.session.commit()
 
 
-def parse_tags(tag_string):
+def parse_tags(tag_string: str | None) -> list[str]:
     if not tag_string:
         return []
     return [tag.strip() for tag in tag_string.split(",") if tag.strip()]
 
 
-def get_ticket_metrics():
+def get_ticket_metrics() -> dict:
     total = Ticket.query.count()
     open_tickets = Ticket.query.filter(Ticket.status.in_(TICKET_OPEN_STATUSES)).count()
     resolved = Ticket.query.filter_by(status="resolved").count()
@@ -199,7 +200,7 @@ def get_ticket_metrics():
     }
 
 
-def get_agent_performance():
+def get_agent_performance() -> list[dict]:
     agents = User.query.filter(User.role.in_(["agent", "admin"])).all()
     performance = []
 
@@ -231,7 +232,7 @@ def get_agent_performance():
     return performance
 
 
-def calculate_sla_compliance():
+def calculate_sla_compliance() -> dict:
     resolved_tickets = Ticket.query.filter(
         Ticket.status.in_(TICKET_CLOSED_STATUSES), Ticket.resolved_at.isnot(None)
     ).all()
@@ -279,7 +280,7 @@ _MAGIC_SIGNATURES = {
 }
 
 
-def validate_upload_sniff(filename, head):
+def validate_upload_sniff(filename: str, head: bytes) -> bool:
     """Verify that the file's magic bytes match its extension where a
     reliable signature exists for that extension. Returns True for
     formats without a signature (txt/csv/log/md/tar/svg...) so those fall

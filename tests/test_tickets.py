@@ -1040,6 +1040,56 @@ class TestAutomationAssign:
             assert ticket.status == "in_progress"
             assert ticket.assigned_to == agent_user.id
 
+    def test_automation_assign_noop_and_escalate_threshold(
+        self, app, db, admin_user
+    ):
+        # Guards the refactored _execute_automation_rule: a missing/unknown
+        # assign target is a no-op; escalate only promotes high|critical.
+        from app.models import AutomationRule
+        from app.utils import _execute_automation_rule
+
+        with app.app_context():
+            ticket = Ticket(
+                ticket_number="TKT-300002",
+                title="Automation guard",
+                description="d",
+                created_by=admin_user.id,
+                status="new",
+                assigned_to=None,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            for config in ({}, {"assign_to": 999999}):
+                rule = AutomationRule(
+                    name="auto-assign",
+                    trigger_type="ticket_created",
+                    action_type="assign",
+                    action_config=config,
+                    is_active=True,
+                    priority=10,
+                )
+                _execute_automation_rule(ticket, rule)
+                assert ticket.assigned_to is None
+
+            escalate = AutomationRule(
+                name="esc",
+                trigger_type="ticket_created",
+                action_type="escalate",
+                action_config={},
+                is_active=True,
+                priority=5,
+            )
+            _execute_automation_rule(ticket, escalate)
+            assert ticket.priority == "medium"
+
+            ticket.priority = "high"
+            _execute_automation_rule(ticket, escalate)
+            assert ticket.priority == "critical"
+
 
 class TestLinkAsset:
     """Characterize /tickets/<id>/link-asset (link_asset:344-365)."""

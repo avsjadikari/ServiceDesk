@@ -17,7 +17,7 @@ SUPPORTED_LANGUAGES = {
 _TRANSLATIONS = {}
 
 
-def load_translations():
+def load_translations() -> dict:
     """Load all JSON translation files from app/translations directory."""
     global _TRANSLATIONS
     base_dir = os.path.dirname(__file__)
@@ -39,7 +39,7 @@ def load_translations():
     return _TRANSLATIONS
 
 
-def get_translation(key, **kwargs):
+def get_translation(key: str | None, **kwargs) -> str:
     """Retrieve translated text for key in current language (g.lang)."""
     if key is None:
         return ""
@@ -88,7 +88,7 @@ t = get_translation
 
 
 @i18n_bp.route("/set-lang/<lang_code>")
-def set_language(lang_code):
+def set_language(lang_code: str):
     """Update session language and redirect back to previous page."""
     if lang_code in SUPPORTED_LANGUAGES:
         session["lang"] = lang_code
