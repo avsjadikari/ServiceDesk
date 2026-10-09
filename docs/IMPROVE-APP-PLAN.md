@@ -23,7 +23,7 @@
 | 4 — Look as clear as it works | refactoring-ui | pending | DESIGN.md + EXPERIMENTS.md | |
 | 5 — Make actions feel alive | microinteractions | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 6 — Sharpen the words | made-to-stick | done | POSITIONING.md + EXPERIMENTS.md | 2026-10-09 |
-| 7 — Persuade honestly | influence-psychology | pending | POSITIONING.md + EXPERIMENTS.md | |
+| 7 — Persuade honestly | influence-psychology | done | POSITIONING.md + EXPERIMENTS.md | 2026-10-09 |
 | 8 — Feel fast where touched | high-perf-browser | pending | DESIGN.md + EXPERIMENTS.md | |
 | 9 — Brutal end-to-end review | steve-jobs-design-review | pending | PRODUCT.md + DESIGN.md + EXPERIMENTS.md | |
 
@@ -54,6 +54,7 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: reaso
 - [x] Phase 2 (2026-10-09): done — U1/U2/U3 shipped (ticket search, you-are-here, filter labels).
 - [x] Phase 5 (microinteractions, 2026-10-09): done — M1 submit-guard shipped (double-submit + loading state).
 - [x] Phase 6 (made-to-stick, 2026-10-09): done — reassurance copy set + POSITIONING.md; fixed dead email path (`_notify` never passed `ticket`) + portal now sends created email.
-- [ ] Phase 7 entry decision (persuade honestly): audit badge/count/praise claims for accuracy before any polish.
+- [x] Phase 7 (influence-psychology, 2026-10-09): done — "Recommended"→"Most Read", helpful survey = two honest options (dismiss never counts), author bylines on portal cards. Honesty diagnostic 5/10→9/10.
+- [ ] Phase 8 entry decision (feel fast where touched): warm up obvious hot paths before full performance phase.
 - [ ] Every shipped change lands in EXPERIMENTS.md with a pre-committed metric.
 - [ ] Optional: continuous-discovery if the audit needs weekly user contact rather than current evidence.

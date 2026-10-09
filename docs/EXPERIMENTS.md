@@ -33,6 +33,12 @@ Every shipped change carries a pre-committed metric. Measured before/after; judg
 - **Outcome metric (2 wk):** resolved-ticket reopen rate (<7d) — confidence that "resolved" reads as real, not silence.
 - **Judge with:** complaints channel + reopen-rate before/after.
 
+## Honest praise (Phase 7, influence-psychology)
+
+- **Shipped:** 2026-10-09 — "Recommended" → "Most Read" (exact-ordering label); helpful survey now two real options ("It helped me" increments, "Not for me" is a no-op) so "X found this helpful" is a strict yes-tally; portal article cards get author byline + updated date (internal authority, no fabrication).
+- **Metric:** helpful_count / view_count ratio (affirmation rate). Baseline: near 1.0 pre-fix (forced-yes). Target: honest 0.2–0.5 = people who actually found it helped. Judge via settings/analytics.
+- Reverse spot-check: no fabricated counts anywhere (view/helpful are live columns).
+
 ## Submit-guard (M1)
 
 - **Shipped:** 2026-10-09 — all form submits disable + spinner (`main.js:initSubmitGuards`); board "Save & move" disabled until settle.

@@ -25,6 +25,9 @@ without them chasing. This is the emotional hire (Phase 1) made concrete.
 - Gloss must stay truthful per status (`pending` = "we're waiting on
   something", not "we're on it").
 - No invented social proof, no praise without a real count.
+- "found this helpful" is a strict yes-tally — dismiss votes never count
+  (Added Phase 7: helpful form is two real options, not a forced yes).
+- "Most Read" is an exact statement of the ordering — never "Recommended".
 
 ## Not positioned
 
