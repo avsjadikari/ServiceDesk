@@ -172,10 +172,12 @@ class TestKnowledgeCharacterization:
         resp = client.get("/knowledge?category=Hardware")
         assert resp.status_code == 200
         # CHARACTERIZED: only published matching category listed; drafts excluded.
+        # Match inside the <a> title tags: bare substrings collide randomly with
+        # the base64 CSRF token (observed: "A2" in token → flaky fail).
         body = resp.get_data(as_text=True)
-        assert "A1" in body
-        assert "A2" not in body
-        assert "A3" not in body
+        assert ">A1<" in body
+        assert ">A2<" not in body
+        assert ">A3<" not in body
 
     def test_new_non_agent_forbidden(self, client, app, admin_user, regular_user):
         """Line 70: POST /knowledge/new as regular user -> 403."""
