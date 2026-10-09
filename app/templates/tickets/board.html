@@ -243,6 +243,10 @@
             comment.value = '';
             comment.classList.remove('is-invalid');
             bootstrap.Modal.getOrCreateInstance(document.getElementById('statusModal')).show();
+            const confirmBtn = document.getElementById('boardStatusConfirm');
+            confirmBtn.disabled = false;
+            const sp = confirmBtn.querySelector('.spinner-border');
+            if (sp) sp.remove();
             setTimeout(() => comment.focus(), 50);
         }
 
@@ -312,6 +316,13 @@
                 return;
             }
             commentEl.classList.remove('is-invalid');
+
+            const confirmBtn = document.getElementById('boardStatusConfirm');
+            confirmBtn.disabled = true;
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner-border spinner-border-sm me-1';
+            spinner.setAttribute('aria-hidden', 'true');
+            confirmBtn.prepend(spinner);
 
             const selectEl = document.getElementById('boardAssignSelect');
             const assigneeId = selectEl.value;

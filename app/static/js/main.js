@@ -122,6 +122,24 @@
         document.body.removeChild(link);
     }
 
+    // 6. Double-submit protection: disable + spinner on submit
+    function initSubmitGuards() {
+        document.addEventListener('submit', function (e) {
+            const form = e.target;
+            if (!(form instanceof HTMLFormElement)) return;
+            const button = e.submitter && e.submitter.matches('button[type="submit"]')
+                ? e.submitter
+                : form.querySelector('button[type="submit"]');
+            if (!button || button.disabled) return;
+
+            button.disabled = true;
+            const spinner = document.createElement('span');
+            spinner.className = 'spinner-border spinner-border-sm me-1';
+            spinner.setAttribute('aria-hidden', 'true');
+            button.prepend(spinner);
+        });
+    }
+
     // Expose APIs globally
     window.ServiceDesk = {
         initTheme,
@@ -129,7 +147,8 @@
         getCSRFToken,
         showToast,
         setupTableFilter,
-        exportTableToCSV
+        exportTableToCSV,
+        initSubmitGuards
     };
 
     // Run theme immediately on DOM ready
@@ -138,4 +157,5 @@
     } else {
         initTheme();
     }
+    initSubmitGuards();
 })();
