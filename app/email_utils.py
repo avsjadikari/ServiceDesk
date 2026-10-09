@@ -5,7 +5,9 @@ import socket
 import threading
 
 from flask_mail import Mail, Message
-from flask import current_app
+from flask import current_app, url_for
+
+from app.enums import STATUS_GLOSS
 
 mail = Mail()
 
@@ -221,16 +223,21 @@ def join_email_workers(timeout=30):
 
 
 def send_ticket_created(ticket):
-    subject = f"[{ticket.ticket_number}] New Ticket Created"
+    sla_line = (
+        f"Expected Resolution: {ticket.sla_deadline:%m/%d/%Y %H:%M}\n\n"
+        if ticket.sla_deadline
+        else ""
+    )
+    subject = f"Ticket {ticket.ticket_number}: your request is in"
     body = (
-        f"A new ticket has been created:\n\n"
-        f"Ticket Number: {ticket.ticket_number}\n"
-        f"Title: {ticket.title}\n"
+        f"Your request is in — it's now ticket {ticket.ticket_number} and our team has it.\n\n"
+        f"Request: {ticket.title}\n"
         f"Priority: {ticket.priority}\n"
-        f"Category: {ticket.category}\n"
-        f"Status: {ticket.status}\n\n"
-        f"Description:\n{ticket.description}\n\n"
-        f"Log in to the ServiceDesk system to view and respond to this ticket."
+        f"Category: {ticket.category or '-'}\n\n"
+        f"{sla_line}"
+        f"We'll email you the moment anything changes — no need to check back.\n\n"
+        f"Track or update it any time: "
+        f"{url_for('portal.view_ticket', ticket_id=ticket.id, _external=True)}\n"
     )
     return send_email(ticket.creator.email, subject, body)
 
@@ -253,14 +260,15 @@ def send_ticket_assigned(ticket):
 
 
 def send_ticket_status_changed(ticket, old_status, new_status):
-    subject = f"[{ticket.ticket_number}] Ticket Status Updated"
+    gloss = STATUS_GLOSS.get(new_status, new_status)
+    subject = f"Ticket {ticket.ticket_number}: status update"
     body = (
-        f"Your ticket status has been updated:\n\n"
-        f"Ticket Number: {ticket.ticket_number}\n"
-        f"Title: {ticket.title}\n"
-        f"Previous Status: {old_status}\n"
-        f"New Status: {new_status}\n\n"
-        f"Log in to the ServiceDesk system to view the updated ticket."
+        f"Your ticket just moved:\n\n"
+        f"Ticket: {ticket.ticket_number}\n"
+        f"Request: {ticket.title}\n"
+        f"What's happening: {gloss.capitalize()}\n\n"
+        f"Track it any time: "
+        f"{url_for('portal.view_ticket', ticket_id=ticket.id, _external=True)}\n"
     )
     return send_email(ticket.creator.email, subject, body)
 

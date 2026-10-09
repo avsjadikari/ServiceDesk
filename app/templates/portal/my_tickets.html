@@ -51,7 +51,7 @@
         {% if not tickets.items %}
         <div class="text-center py-5 text-muted">
             <i class="bi bi-inbox" style="font-size: 3rem;"></i>
-            <p class="mt-2">You haven't submitted any tickets yet</p>
+            <p class="mt-2">Nothing waiting on you. When something breaks, raise a ticket here — it goes straight to our team, and you'll get an email the moment it moves.</p>
             <a href="{{ url_for('portal.new_ticket') }}" class="btn btn-primary">Submit Your First Ticket</a>
         </div>
         {% endif %}

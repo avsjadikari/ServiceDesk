@@ -1660,3 +1660,59 @@ class TestSearchAndNavActive:
 
             resp = client.get("/tickets/board")
             assert resp.data.count(b'class="nav-link active"') == 1
+
+
+class TestReassuranceCopy:
+    def test_status_gloss_covers_all_statuses(self):
+        from app.enums import STATUS_GLOSS, TICKET_STATUSES
+
+        assert set(TICKET_STATUSES) == set(STATUS_GLOSS)
+
+    def test_created_email_reassures_and_names_deadline(
+        self, client, app, db, admin_user
+    ):
+        from unittest import mock
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            with mock.patch("app.email_utils.send_email") as send:
+                client.post(
+                    "/portal/tickets/new",
+                    data={
+                        "title": "Printer jam on the third floor",
+                        "type": "incident",
+                        "priority": "high",
+                        "category": "Hardware",
+                        "description": "It keeps eating paper.",
+                    },
+                    follow_redirects=True,
+                )
+            body = send.call_args.args[2]
+            assert "your request is in" in send.call_args.args[1]
+            assert "Expected Resolution:" in body
+            assert "no need to check back" in body
+
+    def test_status_email_uses_plain_language_gloss(self, client, app, db, admin_user):
+        from unittest import mock
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-320001",
+                title="Can't reach email",
+                description="SMTP timeout",
+                type="incident",
+                priority="medium",
+                created_by=admin_user.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            with mock.patch("app.email_utils.send_email") as send:
+                client.post(
+                    f"/tickets/{ticket.id}/update-status", data={"status": "in_progress"}
+                )
+            body = send.call_args.args[2]
+            assert "a support person is actively working on it" in body.lower()
+            assert "in_progress" not in send.call_args.args[1]

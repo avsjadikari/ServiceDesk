@@ -40,7 +40,7 @@
                 {% endfor %}
                 
                 {% if not comments %}
-                <p class="text-muted text-center">No comments yet</p>
+                <p class="text-muted text-center">No notes from the team yet — you get an email the moment anything changes.</p>
                 {% endif %}
             </div>
             
@@ -73,6 +73,9 @@
                             <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
                                 {{ ticket.status }}
                             </span>
+                            {% if status_gloss %}
+                            <span class="text-muted small d-block mt-1">{{ status_gloss }}</span>
+                            {% endif %}
                         </td>
                     </tr>
                     <tr>

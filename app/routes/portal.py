@@ -94,8 +94,17 @@ def new_ticket():
         db.session.add(ticket)
         db.session.commit()
 
+        from app.email_utils import send_ticket_created
+
+        send_ticket_created(ticket)
+
         flash(
-            f"Ticket {ticket.ticket_number} submitted successfully. We will review it shortly.",
+            f"Ticket {ticket.ticket_number} submitted — you're all set."
+            + (
+                f" Expected Resolution: {ticket.sla_deadline:%m/%d/%Y %H:%M}."
+                if ticket.sla_deadline
+                else " We'll pick it up from here."
+            ),
             "success",
         )
         return redirect(url_for("portal.my_tickets"))
@@ -134,9 +143,12 @@ def view_ticket(ticket_id):
         .all()
     )
 
+    from app.enums import STATUS_GLOSS
+
     return render_template(
         "portal/view_ticket.html",
         ticket=ticket,
         comment_form=comment_form,
         comments=comments,
+        status_gloss=STATUS_GLOSS.get(ticket.status),
     )
