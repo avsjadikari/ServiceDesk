@@ -18,7 +18,7 @@
 | Phase | Skill | Status | Artifact | Date |
 |---|---|---|---|---|
 | 1 — Re-anchor on the job | jobs-to-be-done | done | CUSTOMER.md (GATE) | 2026-10-09 |
-| 2 — Remove friction | ux-heuristics | deferred: user routed to Phase 4; run after Phase 4 | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
+| 2 — Remove friction | ux-heuristics | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 3 — Design out errors | design-everyday-things | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 4 — Make it delightful | microinteractions | done | DESIGN.md + EXPERIMENTS.md | 2026-10-09 |
 | 4 — Look as clear as it works | refactoring-ui | pending | DESIGN.md + EXPERIMENTS.md | |
@@ -51,7 +51,7 @@ Statuses: pending · in-progress · awaiting-evidence · done · deferred: reaso
 - [x] Phase 1 (GATE, 2026-10-09): done — CUSTOMER.md (job statement, dimensions, forces, hire moments, alternatives). Journey target set: **emotional dimension + Little Hire** → daily loop reassurance.
 - [x] Phase 3 (2026-10-09): done — K1/K4/K5/K6 shipped (explicit Apply, error feedback, human labels). DESIGN.md 5/10→7/10.
 - [x] Phase 4 (2026-10-09): done — M1 submit-guard shipped (double-submit + loading state).
-- [ ] Phase 2 entry decision (ux-heuristics): survey labels/filters/board for Nielsen violations; severity × frequency ordering. DESIGN.md + EXPERIMENTS.md.
-- [ ] Phase 5+ entry per journey order, or direct to user's next priority.
+- [x] Phase 2 (2026-10-09): done — U1/U2/U3 shipped (ticket search, you-are-here, filter labels).
+- [ ] Phase 5 entry decision (made-to-stick): audit end-user reassurance copy (confirmation, SLA, empty states) against SUCCESs; rewrite weak spots.
 - [ ] Every shipped change lands in EXPERIMENTS.md with a pre-committed metric.
 - [ ] Optional: continuous-discovery if the audit needs weekly user contact rather than current evidence.

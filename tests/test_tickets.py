@@ -1614,3 +1614,49 @@ class TestErrorFeedback:
             response = client.get(f"/tickets/{ticket.id}")
             assert b"onchange" not in response.data
             assert response.data.count(b"Apply") == 2
+
+
+class TestSearchAndNavActive:
+    """U1/U2: ticket search filters results; sidebar shows current section."""
+
+    def _make_ticket(self, db, number, title, category, created_by):
+        ticket = Ticket(
+            ticket_number=number,
+            title=title,
+            description=f"Details for {title}",
+            created_by=created_by,
+            type="incident",
+            priority="medium",
+            category=category,
+        )
+        db.session.add(ticket)
+        db.session.commit()
+        return ticket
+
+    def test_search_filters_by_title_and_number(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            self._make_ticket(db, "TKT-310001", "Printer Jam", "Hardware", admin_user.id)
+            self._make_ticket(db, "TKT-310002", "Email outage", "Email", admin_user.id)
+
+            resp = client.get("/tickets?q=printer")
+            assert b"TKT-310001" in resp.data
+            assert b"TKT-310002" not in resp.data
+
+            resp = client.get("/tickets?q=TKT-310002")
+            assert b"TKT-310002" in resp.data
+            assert b"TKT-310001" not in resp.data
+
+            resp = client.get("/tickets?q=Details for Printer")
+            assert b"TKT-310001" in resp.data
+            assert b"TKT-310002" not in resp.data
+
+    def test_sidebar_highlights_current_section(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            resp = client.get("/tickets")
+            assert resp.data.count(b'class="nav-link active"') == 1
+
+            resp = client.get("/tickets/board")
+            assert resp.data.count(b'class="nav-link active"') == 1

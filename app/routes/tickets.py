@@ -15,6 +15,7 @@ from flask import (
     url_for,
 )
 from flask_login import current_user, login_required
+from sqlalchemy import or_
 from sqlalchemy.orm import joinedload
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
@@ -97,7 +98,18 @@ def index():
     priority = request.args.get("priority")
     category = request.args.get("category")
     assigned_to = request.args.get("assigned_to", type=int)
+    q = (request.args.get("q") or "").strip()
 
+    if q:
+        like = f"%{q}%"
+        query = query.filter(
+            or_(
+                Ticket.ticket_number.ilike(like),
+                Ticket.title.ilike(like),
+                Ticket.description.ilike(like),
+                Ticket.category.ilike(like),
+            )
+        )
     if status:
         query = query.filter_by(status=status)
     if priority:

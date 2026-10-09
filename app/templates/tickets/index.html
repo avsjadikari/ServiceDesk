@@ -30,23 +30,29 @@
 <div class="card mb-4">
     <div class="card-body">
         <form method="GET" class="row g-3">
+            <div class="col-md-3">
+                <label for="{{ form.q.id }}" class="form-label small mb-1">{{ _('Search') }}</label>
+                {{ form.q(class="form-control", placeholder=_('# or title…')) }}
+            </div>
             <div class="col-md-2">
+                <label class="form-label small mb-1">{{ _('Status') }}</label>
                 {{ form.status(class="form-select") }}
             </div>
             <div class="col-md-2">
+                <label class="form-label small mb-1">{{ _('Priority') }}</label>
                 {{ form.priority(class="form-select") }}
             </div>
             <div class="col-md-2">
+                <label class="form-label small mb-1">{{ _('Category') }}</label>
                 {{ form.category(class="form-select") }}
             </div>
             <div class="col-md-2">
+                <label class="form-label small mb-1">{{ _('Assigned To') }}</label>
                 {{ form.assigned_to(class="form-select") }}
             </div>
-            <div class="col-md-2">
-                <button type="submit" class="btn btn-primary w-100">{{ _('Filter') }}</button>
-            </div>
-            <div class="col-md-2">
-                <a href="{{ url_for('tickets.index') }}" class="btn btn-secondary w-100">{{ _('Clear') }}</a>
+            <div class="col-md-1 d-grid gap-2">
+                <button type="submit" class="btn btn-primary">{{ _('Filter') }}</button>
+                <a href="{{ url_for('tickets.index') }}" class="btn btn-secondary">{{ _('Clear') }}</a>
             </div>
         </form>
     </div>

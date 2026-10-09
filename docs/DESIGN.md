@@ -28,6 +28,18 @@ Scored the agent submit moments (create / comment / upload / status Apply / assi
 | M2 | Stepper "just moved" pulse on status change | skipped (needs prev-status plumbing) |
 | M3 | Live title/comment char counters | skipped (clutter; add if 200-char limit hit) |
 
+## Heuristic sweep (Phase 2, ux-heuristics)
+
+Scored 5/10 (Quick Diagnostic: search ∅, you-are-here, undo-in-place partial, keyboard partial).
+
+| # | Sev | Finding | Status |
+|---|---|---|---|
+| U1 | 3 | No free-text ticket search; index copy promises one | **shipped** (`q` field, ilike across number/title/description/category) |
+| U2 | 2 | No "you are here" nav highlight | **shipped** (endpoint-based `active`) |
+| U3 | 2 | 4 unlabeled filter dropdowns | **shipped** (labels + search box) |
+| U4 | 2 | Board drop is mouse-only; keyboard a11y limited | backlog |
+| U5 | 1 | No `maxlength` on title/desc inputs (200-char limit bites post-submit) | backlog |
+
 ### Strengths (protect)
 - Board: optimistic move + confirm modal + mandatory comment + cancel/restore = correct error recovery (`board.html:292-348`).
 - Constraint present: assign picker hidden for non-"assigned" columns; assign select hidden on closed tickets.

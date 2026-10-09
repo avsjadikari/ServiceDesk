@@ -449,32 +449,32 @@
                 <div class="position-sticky pt-3">
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('main.dashboard') }}">
+                            <a class="nav-link {% if request.endpoint == 'main.dashboard' %}active{% endif %}" href="{{ url_for('main.dashboard') }}">
                                 <i class="bi bi-speedometer2"></i>{{ _('Dashboard') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tickets.index') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('tickets.') and request.endpoint != 'tickets.board' %}active{% endif %}" href="{{ url_for('tickets.index') }}">
                                 <i class="bi bi-ticket-detailed"></i>{{ _('Tickets') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('tickets.board') }}">
+                            <a class="nav-link {% if request.endpoint == 'tickets.board' %}active{% endif %}" href="{{ url_for('tickets.board') }}">
                                 <i class="bi bi-kanban"></i>{{ _('Kanban Board') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('knowledge.index') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('knowledge.') %}active{% endif %}" href="{{ url_for('knowledge.index') }}">
                                 <i class="bi bi-book"></i>{{ _('Knowledge Base') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('assets.index') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('assets.') %}active{% endif %}" href="{{ url_for('assets.index') }}">
                                 <i class="bi bi-pc"></i>{{ _('Assets') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('analytics.index') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('analytics.') %}active{% endif %}" href="{{ url_for('analytics.index') }}">
                                 <i class="bi bi-graph-up"></i>{{ _('Analytics') }}
                             </a>
                         </li>
@@ -485,17 +485,17 @@
                     {% if current_user.is_admin() %}
                     <ul class="nav flex-column">
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('settings.index') }}">
+                            <a class="nav-link {% if request.endpoint and request.endpoint.startswith('settings.') %}active{% endif %}" href="{{ url_for('settings.index') }}">
                                 <i class="bi bi-sliders"></i>{{ _('System Settings') }}
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('setup.db_init') }}">
+                            <a class="nav-link {% if request.endpoint == 'setup.db_init' %}active{% endif %}" href="{{ url_for('setup.db_init') }}">
                                 <i class="bi bi-database-gear"></i>DB Initialize
                             </a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link" href="{{ url_for('setup.db_backup') }}">
+                            <a class="nav-link {% if request.endpoint == 'setup.db_backup' %}active{% endif %}" href="{{ url_for('setup.db_backup') }}">
                                 <i class="bi bi-download"></i>DB Backup
                             </a>
                         </li>

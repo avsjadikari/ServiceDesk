@@ -194,6 +194,7 @@ class TicketForm(FlaskForm):
 
 
 class TicketFilterForm(FlaskForm):
+    q = StringField("Search", validators=[Optional(), Length(max=200)])
     status = SelectField(
         "Status",
         choices=[

@@ -17,6 +17,13 @@ Every shipped change carries a pre-committed metric. Measured before/after; judg
 
 - K3 stepper vs dropdown label alignment — metric: time on view page for agents in `pending`.
 - K7 category forced-value — metric: category correction rate on edit.
+- U4 board keyboard a11y, U5 input maxlength — metric: none pre-committed until shipped.
+
+## Ticket search (U1)
+
+- **Shipped:** 2026-10-09 — `q` on index filter bar; ilike over number/title/description/category.
+- **Metric:** share of index views that carry `q` (findability pain proxy). Baseline 0 (feature new). Target: plateau above 5% = search adopted by agents in the daily loop.
+- **Window:** 2 weeks. Judge with U2/U3 (nav highlight, filter labels) against complaints channel.
 
 ## Submit-guard (M1)
 
