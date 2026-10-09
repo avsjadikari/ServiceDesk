@@ -183,6 +183,20 @@ def send_email(to, subject, body, html=None, sender=None, async_=None):
         return False
 
 
+def notify(send_fn, *args, **kwargs):
+    """Best-effort send for request adapters: a failing email must never
+    fail the surrounding request, so log and continue. Returns the send
+    function's result, or False if it raised."""
+    try:
+        return send_fn(*args, **kwargs)
+    except Exception:
+        logger.warning(
+            "Email send failed (%s)", getattr(send_fn, "__name__", send_fn),
+            exc_info=True,
+        )
+        return False
+
+
 def _run_in_background(target, *args):
     try:
         target(*args)

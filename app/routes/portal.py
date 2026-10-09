@@ -3,7 +3,8 @@ from flask_login import login_required, current_user
 from app import db
 from app.models import Ticket, Article, Comment
 from app.forms import TicketForm, CommentForm
-from app.utils import build_ticket
+from app.policy import can_view_portal_ticket
+from app.tickets_lifecycle import create_ticket
 
 portal = Blueprint("portal", __name__)
 
@@ -82,7 +83,7 @@ def new_ticket():
     form.assigned_to.choices = [(0, "")]
 
     if form.validate_on_submit():
-        ticket = build_ticket(
+        ticket = create_ticket(
             title=form.title.data,
             description=form.description.data,
             ticket_type=form.type.data,
@@ -90,13 +91,7 @@ def new_ticket():
             category=form.category.data,
             created_by_id=current_user.id,
         )
-
-        db.session.add(ticket)
         db.session.commit()
-
-        from app.email_utils import send_ticket_created
-
-        send_ticket_created(ticket)
 
         flash(
             f"Ticket {ticket.ticket_number} submitted — you're all set."
@@ -117,7 +112,7 @@ def new_ticket():
 def view_ticket(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
 
-    if ticket.created_by != current_user.id:
+    if not can_view_portal_ticket(current_user, ticket):
         from flask import abort
 
         abort(403)

@@ -14,8 +14,9 @@ from flask import (
 )
 from flask_login import login_user, current_user
 from sqlalchemy import text
-from app import db, _generate_temp_password
-from app.models import User, Article
+from app import db
+from app.models import User
+from app.seed import seed_accounts, seed_articles
 from app.forms import SetupForm
 
 setup = Blueprint("setup", __name__)
@@ -121,147 +122,19 @@ def wizard():
 
         set_company_name(company_name, user_id=None)
 
-        admin = User(
-            username=admin_username,
-            email=admin_email,
-            full_name=admin_full_name,
-            role="admin",
-            department="IT",
-            is_active=True,
-            must_change_password=True,
+        admin, demo_passwords = seed_accounts(
+            admin_username=admin_username,
+            admin_email=admin_email,
+            admin_password=admin_password,
+            admin_full_name=admin_full_name,
         )
-        admin.set_password(admin_password)
-        db.session.add(admin)
-        db.session.flush()
-
-        agent_pw = _generate_temp_password()
-        agent = User(
-            username="agent",
-            email="agent@servicedesk.local",
-            full_name="Support Agent",
-            role="agent",
-            department="IT Support",
-            is_active=True,
-            must_change_password=True,
-        )
-        agent.set_password(agent_pw)
-        db.session.add(agent)
-
-        user_pw = _generate_temp_password()
-        user = User(
-            username="user",
-            email="user@servicedesk.local",
-            full_name="Regular User",
-            role="user",
-            department="Operations",
-            is_active=True,
-            must_change_password=True,
-        )
-        user.set_password(user_pw)
-        db.session.add(user)
-
-        sample_articles = [
-            Article(
-                title="How to Reset Your Password",
-                content=(
-                    "# Password Reset Guide\n\n"
-                    "Follow these steps to reset your password:\n\n"
-                    '1. Go to the login page\n2. Click "Forgot Password"\n'
-                    "3. Enter your email address\n"
-                    "4. Check your inbox for reset link\n"
-                    "5. Create a new password\n\n"
-                    "## Requirements\n- At least 8 characters\n"
-                    "- Include uppercase and lowercase\n"
-                    "- Include a number\n- Include a special character\n\n"
-                    "## Common Issues\n"
-                    "- If you don't receive the email, check your spam folder\n"
-                    "- For immediate assistance, contact IT support"
-                ),
-                category="Account/Access",
-                tags=["password", "reset", "security"],
-                status="published",
-                author_id=admin.id,
-            ),
-            Article(
-                title="VPN Setup Guide",
-                content=(
-                    "# Connecting to VPN\n\n## Prerequisites\n"
-                    "- Active directory credentials\n- VPN client installed\n\n"
-                    "## Steps to Connect\n\n"
-                    "1. Open the VPN client\n2. Enter server address: vpn.company.local\n"
-                    "3. Click Connect\n4. Enter your credentials\n"
-                    "5. Complete 2FA verification\n\n## Troubleshooting\n\n"
-                    "If you cannot connect:\n- Check your internet connection\n"
-                    "- Verify credentials are correct\n- Restart the VPN client\n"
-                    "- Contact IT support"
-                ),
-                category="Network",
-                tags=["vpn", "remote", "network"],
-                status="published",
-                author_id=admin.id,
-            ),
-            Article(
-                title="Requesting Software Installation",
-                content=(
-                    "# Software Request Process\n\n## Approved Software\n"
-                    "The following software is pre-approved:\n"
-                    "- Microsoft Office Suite\n- Adobe Acrobat Reader\n"
-                    "- Chrome/Firefox browsers\n- 7-Zip\n- VLC Media Player\n\n"
-                    "## Request Process\n\n"
-                    "1. Log in to ServiceDesk\n2. Submit a new ticket\n"
-                    '3. Select "Software Request"\n'
-                    "4. Provide software name and business justification\n"
-                    "5. Wait for approval (24-48 hours)\n\n"
-                    "## Unapproved Software\n"
-                    "For software not in the approved list, manager approval is required."
-                ),
-                category="Software",
-                tags=["software", "request", "installation"],
-                status="published",
-                author_id=admin.id,
-            ),
-            Article(
-                title="Email Configuration Guide",
-                content=(
-                    "# Email Configuration\n\n## Outlook Setup\n\n"
-                    "### Automatic Setup\n1. Open Outlook\n2. Enter your email address\n"
-                    "3. Click Connect\n4. Enter your password\n5. Complete 2FA if prompted\n\n"
-                    "### Manual Setup\nIf automatic setup fails:\n"
-                    "- Server: outlook.office365.com\n- Port: 993\n"
-                    "- Encryption: SSL/TLS\n- IMAP or POP3 available"
-                ),
-                category="Email",
-                tags=["email", "outlook", "configuration"],
-                status="published",
-                author_id=admin.id,
-            ),
-            Article(
-                title="Network Drive Mapping",
-                content=(
-                    "# Mapping Network Drives\n\n## Common Network Shares\n"
-                    "- S:\\\\ - Shared documents\n- T:\\\\ - Team folders\n"
-                    "- U:\\\\ - User home directory\n\n## How to Map\n"
-                    "1. Open File Explorer\n2. Right-click \"This PC\"\n"
-                    "3. Select \"Map network drive\"\n4. Choose a drive letter\n"
-                    "5. Enter the folder path\n6. Check \"Reconnect at logon\"\n\n"
-                    "## Access Issues\n"
-                    "Contact IT support if you cannot access your assigned drives."
-                ),
-                category="Network",
-                tags=["network", "drive", "mapping"],
-                status="published",
-                author_id=admin.id,
-            ),
-        ]
-
-        for article in sample_articles:
-            db.session.add(article)
+        seed_articles(author_id=admin.id)
 
         db.session.commit()
 
         session["setup_complete"] = True
         session["company_name"] = company_name
-        session["setup_temp_passwords"] = {"agent": agent_pw, "user": user_pw}
+        session["setup_temp_passwords"] = demo_passwords
 
         flash(
             "Setup completed. Please log in. "

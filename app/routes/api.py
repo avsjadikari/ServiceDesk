@@ -7,8 +7,9 @@ from app.enums import (
     TICKET_TYPES,
 )
 from app.models import Ticket, Article, Asset, User
+from app import tickets_lifecycle
+from app.policy import can_view_asset, can_view_ticket
 from app.utils import (
-    build_ticket,
     get_ticket_metrics,
     calculate_sla_compliance,
     log_audit,
@@ -78,7 +79,7 @@ def create_ticket():
     if priority not in VALID_TICKET_PRIORITIES:
         return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(VALID_TICKET_PRIORITIES))}"}), 400
 
-    ticket = build_ticket(
+    ticket = tickets_lifecycle.create_ticket(
         title=title,
         description=(data.get("description") or "").strip(),
         ticket_type=ticket_type,
@@ -87,7 +88,6 @@ def create_ticket():
         created_by_id=current_user.id,
     )
 
-    db.session.add(ticket)
     db.session.commit()
 
     return jsonify(
@@ -104,7 +104,7 @@ def create_ticket():
 def get_ticket(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
 
-    if not current_user.is_agent() and ticket.created_by != current_user.id:
+    if not can_view_ticket(current_user, ticket):
         return jsonify({"error": "Unauthorized"}), 403
 
     return jsonify(
@@ -152,6 +152,7 @@ def update_ticket(ticket_id):
         if status not in VALID_TICKET_STATUSES:
             return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(VALID_TICKET_STATUSES))}"}), 400
         ticket.status = status
+        ticket.apply_status_timestamps(status)
     if "priority" in data:
         priority = data["priority"]
         if priority not in VALID_TICKET_PRIORITIES:
@@ -283,7 +284,7 @@ def get_assets():
 def get_asset(asset_id):
     asset = Asset.query.get_or_404(asset_id)
 
-    if not current_user.is_agent() and asset.assigned_to != current_user.id:
+    if not can_view_asset(current_user, asset):
         return jsonify({"error": "Unauthorized"}), 403
 
     return jsonify(

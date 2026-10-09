@@ -119,7 +119,7 @@ def log_ticket_audit(ticket, action, details=None, commit=True):
     )
 
 
-def apply_automation_rules(ticket, trigger_type):
+def apply_automation_rules(ticket, trigger_type, commit=True):
     from app.models import AutomationRule
 
     rules = (
@@ -129,10 +129,10 @@ def apply_automation_rules(ticket, trigger_type):
     )
 
     for rule in rules:
-        _execute_automation_rule(ticket, rule)
+        _execute_automation_rule(ticket, rule, commit)
 
 
-def _execute_automation_rule(ticket, rule):
+def _execute_automation_rule(ticket, rule, commit=True):
     if rule.action_type == "assign":
         if rule.action_config and "assign_to" in rule.action_config:
             assignee_id = rule.action_config["assign_to"]
@@ -140,7 +140,8 @@ def _execute_automation_rule(ticket, rule):
             if assignee:
                 ticket.assigned_to = assignee_id
                 ticket.promote_status_if_new()
-                db.session.commit()
+                if commit:
+                    db.session.commit()
 
     elif rule.action_type == "notify":
         pass
@@ -148,7 +149,8 @@ def _execute_automation_rule(ticket, rule):
     elif rule.action_type == "escalate":
         if ticket.priority in ["high", "critical"]:
             ticket.priority = "critical"
-            db.session.commit()
+            if commit:
+                db.session.commit()
 
 
 def parse_tags(tag_string):

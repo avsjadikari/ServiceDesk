@@ -49,6 +49,43 @@ class User(UserMixin, db.Model):
     def set_password(self, password):
         self.password_hash = generate_password_hash(password)
 
+    def apply_password_change(self, password, must_change=False):
+        """Set a new password, clear any failed-login lockout, stamp the
+        reset time, and set the first-login change flag. Caller commits."""
+        self.set_password(password)
+        self.must_change_password = must_change
+        self.reset_failed_logins()
+        self.last_password_reset_at = datetime.utcnow()
+
+    @classmethod
+    def provision(
+        cls,
+        *,
+        username,
+        email,
+        password,
+        full_name=None,
+        role="user",
+        department=None,
+        phone=None,
+        must_change_password=False,
+        is_active=True,
+    ):
+        """Construct a new (unsaved) user with a hashed password. Shared by
+        registration, admin user creation, seed data, and the setup wizard."""
+        user = cls(
+            username=username,
+            email=email,
+            full_name=full_name,
+            role=role,
+            department=department,
+            phone=phone,
+            is_active=is_active,
+            must_change_password=must_change_password,
+        )
+        user.set_password(password)
+        return user
+
     def check_password(self, password):
         return check_password_hash(self.password_hash, password)
 
@@ -175,6 +212,16 @@ class Ticket(db.Model):
         """Promoting a not-yet-assigned ticket marks it assigned; later statuses keep theirs."""
         if self.status in (None, "new"):
             self.status = "assigned"
+
+    def apply_status_timestamps(self, new_status):
+        """Stamp the lifecycle timestamps for a transition to new_status."""
+        now = datetime.utcnow()
+        if new_status == "in_progress" and not self.first_response_at:
+            self.first_response_at = now
+        if new_status == "resolved":
+            self.resolved_at = now
+        if new_status == "closed":
+            self.closed_at = now
 
     @property
     def response_time(self):

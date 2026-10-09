@@ -1,6 +1,5 @@
 import os
 import uuid
-from datetime import datetime
 
 from flask import (
     Blueprint,
@@ -29,9 +28,9 @@ from app.enums import (
 )
 from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
 from app.models import Attachment, Comment, Ticket, User
+from app import tickets_lifecycle
+from app.policy import can_view_ticket, web_agent_required
 from app.utils import (
-    apply_automation_rules,
-    build_ticket,
     log_ticket_audit,
     validate_upload_sniff,
 )
@@ -50,28 +49,6 @@ def _to_int(value):
         return int(value)
     except (TypeError, ValueError):
         return None
-
-
-def _notify(ticket, description, send_fn, *args):
-    """A failing email must not fail the request; log and continue."""
-    try:
-        send_fn(ticket, *args)
-    except Exception:
-        current_app.logger.warning(
-            "Email send failed for ticket %s (%s)", ticket.id, description,
-            exc_info=True,
-        )
-
-
-def _apply_status_timestamps(ticket, new_status):
-    if new_status == "in_progress" and not ticket.first_response_at:
-        ticket.first_response_at = datetime.utcnow()
-
-    if new_status == "resolved":
-        ticket.resolved_at = datetime.utcnow()
-
-    if new_status == "closed":
-        ticket.closed_at = datetime.utcnow()
 
 
 @tickets.route("/tickets")
@@ -124,10 +101,8 @@ def index():
 
 @tickets.route("/tickets/board")
 @login_required
+@web_agent_required
 def board():
-    if not current_user.is_agent():
-        abort(403)
-
     tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
     # Board shows every status except "closed".
     columns = {
@@ -171,7 +146,7 @@ def new():
             if form.assigned_to.data and form.assigned_to.data > 0
             else None
         )
-        ticket = build_ticket(
+        ticket = tickets_lifecycle.create_ticket(
             title=form.title.data,
             description=form.description.data,
             ticket_type=form.type.data,
@@ -180,16 +155,7 @@ def new():
             created_by_id=current_user.id,
             assigned_to=assigned_to,
         )
-        db.session.add(ticket)
         db.session.commit()
-
-        log_ticket_audit(ticket, "create")
-
-        apply_automation_rules(ticket, "ticket_created")
-
-        from app.email_utils import send_ticket_created
-
-        _notify(ticket, "create", send_ticket_created)
 
         flash(f"Ticket {ticket.ticket_number} created successfully.", "success")
 
@@ -205,7 +171,7 @@ def new():
 def view(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
 
-    if not current_user.is_agent() and ticket.created_by != current_user.id:
+    if not can_view_ticket(current_user, ticket):
         abort(403)
 
     comment_form = CommentForm()
@@ -234,10 +200,8 @@ def view(ticket_id):
 
 @tickets.route("/tickets/<int:ticket_id>/edit", methods=["GET", "POST"])
 @login_required
+@web_agent_required
 def edit(ticket_id):
-    if not current_user.is_agent():
-        abort(403)
-
     ticket = Ticket.query.get_or_404(ticket_id)
     form = TicketForm(obj=ticket)
     form.assigned_to.choices = [(0, "Unassigned")] + [
@@ -258,10 +222,8 @@ def edit(ticket_id):
 
 @tickets.route("/tickets/<int:ticket_id>/update-status", methods=["POST"])
 @login_required
+@web_agent_required
 def update_status(ticket_id):
-    if not current_user.is_agent():
-        abort(403)
-
     ticket = Ticket.query.get_or_404(ticket_id)
     new_status = request.json.get("status") if request.is_json else request.form.get("status")
 
@@ -276,22 +238,8 @@ def update_status(ticket_id):
         flash("Invalid status.", "danger")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-    old_status = ticket.status
-    ticket.status = new_status
-
-    _apply_status_timestamps(ticket, new_status)
-
+    tickets_lifecycle.change_status(ticket, new_status)
     db.session.commit()
-
-    log_ticket_audit(
-        ticket,
-        "status_change",
-        {"old_status": old_status, "new_status": new_status},
-    )
-
-    from app.email_utils import send_ticket_status_changed
-
-    _notify(ticket, "status change", send_ticket_status_changed, new_status)
 
     if request.is_json:
         return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
@@ -303,10 +251,8 @@ def update_status(ticket_id):
 
 @tickets.route("/tickets/<int:ticket_id>/assign", methods=["POST"])
 @login_required
+@web_agent_required
 def assign(ticket_id):
-    if not current_user.is_agent():
-        abort(403)
-
     ticket = Ticket.query.get_or_404(ticket_id)
     assignee_id = request.form.get("assigned_to")
 
@@ -325,15 +271,8 @@ def assign(ticket_id):
             flash("Assignee must be an agent or admin.", "danger")
             return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-        ticket.assigned_to = assignee_id
-        ticket.promote_status_if_new()
+        tickets_lifecycle.assign_ticket(ticket, assignee_id)
         db.session.commit()
-
-        log_ticket_audit(ticket, "assign", {"assigned_to": assignee_id})
-
-        from app.email_utils import send_ticket_assigned
-
-        _notify(ticket, "assignment", send_ticket_assigned)
 
         flash(
             f"Ticket assigned to {ticket.assignee.full_name if ticket.assignee else 'Unknown'}.",
@@ -348,25 +287,18 @@ def assign(ticket_id):
 def add_comment(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
 
-    if not current_user.is_agent() and ticket.created_by != current_user.id:
+    if not can_view_ticket(current_user, ticket):
         abort(403)
 
     form = CommentForm()
     if form.validate_on_submit():
-        comment = Comment(
-            ticket_id=ticket.id,
-            user_id=current_user.id,
-            content=form.content.data,
-            is_internal=form.is_internal.data if current_user.is_agent() else False,
+        tickets_lifecycle.add_comment(
+            ticket,
+            form.content.data,
+            form.is_internal.data if current_user.is_agent() else False,
+            current_user.id,
         )
-        db.session.add(comment)
         db.session.commit()
-
-        log_ticket_audit(ticket, "comment")
-
-        from app.email_utils import send_ticket_comment
-
-        _notify(ticket, "comment", send_ticket_comment, comment)
 
         flash("Comment added successfully.", "success")
     else:
@@ -377,10 +309,8 @@ def add_comment(ticket_id):
 
 @tickets.route("/tickets/<int:ticket_id>/link-asset", methods=["POST"])
 @login_required
+@web_agent_required
 def link_asset(ticket_id):
-    if not current_user.is_agent():
-        abort(403)
-
     ticket = Ticket.query.get_or_404(ticket_id)
     asset_id = request.form.get("asset_id")
 
@@ -402,11 +332,7 @@ def link_asset(ticket_id):
 def _can_view_ticket(ticket):
     """A user can view a ticket if they are the reporter or an agent/admin.
     (Assignees are always agents here, so no separate assignee branch.)"""
-    if not current_user.is_authenticated:
-        return False
-    if current_user.is_agent():
-        return True
-    return ticket.created_by == current_user.id
+    return can_view_ticket(current_user, ticket)
 
 
 def _attachment_allowed(filename, mime_type):

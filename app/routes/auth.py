@@ -1,4 +1,3 @@
-from datetime import datetime
 from urllib.parse import urlsplit
 
 from flask import (
@@ -24,6 +23,8 @@ from app.forms import (
     UserEditForm,
 )
 from app.models import User, RecoveryCode
+from app.email_utils import notify
+from app.policy import web_admin_required
 from app.security import generate_password_reset_token, verify_password_reset_token
 from app.utils import log_audit
 
@@ -97,12 +98,9 @@ def login():
                     user.id, "account_locked", "user", user.id,
                     details={"until": user.locked_until.isoformat()},
                 )
-                try:
-                    from app.email_utils import send_account_locked
+                from app.email_utils import send_account_locked
 
-                    send_account_locked(user, user.locked_until)
-                except Exception:
-                    current_app.logger.exception("send_account_locked failed")
+                notify(send_account_locked, user, user.locked_until)
                 flash(
                     "Too many failed login attempts. Your account has been "
                     "temporarily locked.",
@@ -210,17 +208,12 @@ def forgot_password():
         if user and user.is_active:
             token = generate_password_reset_token(user.id)
             reset_url = _external_url("auth.reset_password", token=token)
-            try:
-                from app.email_utils import send_password_reset
+            from app.email_utils import send_password_reset
 
-                if not send_password_reset(user, reset_url):
-                    current_app.logger.warning(
-                        "Password reset email not sent (mail disabled?) user_id=%s",
-                        user.id,
-                    )
-            except Exception:
-                current_app.logger.exception(
-                    "send_password_reset failed user_id=%s", user.id
+            if not notify(send_password_reset, user, reset_url):
+                current_app.logger.warning(
+                    "Password reset email not sent (mail disabled?) user_id=%s",
+                    user.id,
                 )
 
             # Log the account for greppability, but never the reset URL or
@@ -264,10 +257,7 @@ def reset_password(token):
                   "danger")
             return render_template("auth/reset_password.html", form=form, token=token)
 
-        user.set_password(form.new_password.data)
-        user.must_change_password = False
-        user.reset_failed_logins()
-        user.last_password_reset_at = datetime.utcnow()
+        user.apply_password_change(form.new_password.data)
         db.session.commit()
         log_audit(user.id, "password_reset", "user", user.id)
         flash("Your password has been reset. You can now log in.", "success")
@@ -290,9 +280,7 @@ def change_password():
             flash("New password must be different from current password.", "danger")
             return render_template("auth/change_password.html", form=form)
 
-        current_user.set_password(form.new_password.data)
-        current_user.must_change_password = False
-        current_user.last_password_reset_at = datetime.utcnow()
+        current_user.apply_password_change(form.new_password.data)
         db.session.commit()
 
         log_audit(current_user.id, "password_change", "user", current_user.id)
@@ -323,15 +311,14 @@ def register():
 
     form = RegistrationForm()
     if form.validate_on_submit():
-        user = User(
+        user = User.provision(
             username=form.username.data,
             email=form.email.data,
             full_name=form.full_name.data,
             department=form.department.data,
             phone=form.phone.data,
-            role="user",
+            password=form.password.data,
         )
-        user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
 
@@ -345,24 +332,20 @@ def register():
 
 @auth.route("/users/new", methods=["GET", "POST"])
 @login_required
+@web_admin_required
 def create_user():
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     form = RegistrationForm()
 
     if form.validate_on_submit():
-        user = User(
+        user = User.provision(
             username=form.username.data,
             email=form.email.data,
             full_name=form.full_name.data,
             department=form.department.data,
             phone=form.phone.data,
-            role="user",
+            password=form.password.data,
             must_change_password=True,
         )
-        user.set_password(form.password.data)
         db.session.add(user)
         db.session.commit()
 
@@ -391,22 +374,16 @@ def profile():
 
 @auth.route("/users")
 @login_required
+@web_admin_required
 def users():
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     all_users = User.query.all()
     return render_template("auth/users.html", users=all_users)
 
 
 @auth.route("/users/<int:user_id>/edit", methods=["GET", "POST"])
 @login_required
+@web_admin_required
 def edit_user(user_id):
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     user = User.query.get_or_404(user_id)
     form = UserEditForm(obj=user, editing_user_id=user.id)
 
@@ -441,6 +418,7 @@ def edit_user(user_id):
 @auth.route("/users/<int:user_id>/reset-password", methods=["GET", "POST"])
 @login_required
 @limiter.limit("10 per hour")
+@web_admin_required
 def admin_reset_password(user_id):
     """Allow an admin to set a new password for another user.
 
@@ -450,10 +428,6 @@ def admin_reset_password(user_id):
     """
     import secrets as _secrets
 
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     target = User.query.get_or_404(user_id)
     if target.id == current_user.id:
         flash("Use the profile page to change your own password.", "warning")
@@ -462,10 +436,9 @@ def admin_reset_password(user_id):
     form = AdminResetPasswordForm()
     if form.validate_on_submit():
         new_password = _secrets.token_urlsafe(16)
-        target.set_password(new_password)
-        target.must_change_password = form.must_change_password.data
-        target.reset_failed_logins()
-        target.last_password_reset_at = datetime.utcnow()
+        target.apply_password_change(
+            new_password, must_change=form.must_change_password.data
+        )
         db.session.commit()
 
         log_audit(
@@ -483,21 +456,18 @@ def admin_reset_password(user_id):
         # send fails, we still need to make sure the admin can deliver it
         # to the user. Always log the password (info level) and expose it
         # on the success page so it can be communicated out-of-band.
-        email_sent = False
-        try:
-            from app.email_utils import send_admin_password_reset
+        from app.email_utils import send_admin_password_reset
 
-            email_sent = send_admin_password_reset(
-                target,
-                temporary_password=new_password,
-                must_change=target.must_change_password,
+        email_sent = notify(
+            send_admin_password_reset,
+            target,
+            temporary_password=new_password,
+            must_change=target.must_change_password,
+        )
+        if not email_sent:
+            current_app.logger.warning(
+                "admin_password_reset: email not sent user_id=%s", target.id
             )
-            if not email_sent:
-                current_app.logger.warning(
-                    "admin_password_reset: email not sent user_id=%s", target.id
-                )
-        except Exception:
-            current_app.logger.exception("admin_password_reset: send_email failed")
 
         current_app.logger.info(
             "admin_password_reset admin_user_id=%s target_user_id=%s "
@@ -541,11 +511,8 @@ def admin_reset_password(user_id):
 @auth.route("/users/<int:user_id>/disable", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
+@web_admin_required
 def disable_user(user_id):
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     target = User.query.get_or_404(user_id)
     if target.id == current_user.id:
         flash("You cannot disable your own account.", "danger")
@@ -565,12 +532,9 @@ def disable_user(user_id):
         details={"target_username": target.username},
     )
 
-    try:
-        from app.email_utils import send_account_disabled
+    from app.email_utils import send_account_disabled
 
-        send_account_disabled(target)
-    except Exception:
-        current_app.logger.exception("send_account_disabled failed")
+    notify(send_account_disabled, target)
 
     flash(f"User {target.username} has been disabled.", "success")
     return redirect(url_for("auth.users"))
@@ -579,11 +543,8 @@ def disable_user(user_id):
 @auth.route("/users/<int:user_id>/enable", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
+@web_admin_required
 def enable_user(user_id):
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     target = User.query.get_or_404(user_id)
     if target.is_active:
         flash(f"User {target.username} is already active.", "info")
@@ -599,12 +560,9 @@ def enable_user(user_id):
         details={"target_username": target.username},
     )
 
-    try:
-        from app.email_utils import send_account_enabled
+    from app.email_utils import send_account_enabled
 
-        send_account_enabled(target)
-    except Exception:
-        current_app.logger.exception("send_account_enabled failed")
+    notify(send_account_enabled, target)
 
     flash(f"User {target.username} has been enabled.", "success")
     return redirect(url_for("auth.users"))
@@ -613,11 +571,8 @@ def enable_user(user_id):
 @auth.route("/users/<int:user_id>/lock", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
+@web_admin_required
 def lock_user(user_id):
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     target = User.query.get_or_404(user_id)
     if target.id == current_user.id:
         flash("You cannot lock your own account.", "danger")
@@ -646,12 +601,9 @@ def lock_user(user_id):
         details={"target_username": target.username, "minutes": minutes},
     )
 
-    try:
-        from app.email_utils import send_account_manually_locked
+    from app.email_utils import send_account_manually_locked
 
-        send_account_manually_locked(target, unlock_at)
-    except Exception:
-        current_app.logger.exception("send_account_manually_locked failed")
+    notify(send_account_manually_locked, target, unlock_at)
 
     flash(
         f"User {target.username} has been locked for {minutes} minutes "
@@ -664,11 +616,8 @@ def lock_user(user_id):
 @auth.route("/users/<int:user_id>/unlock", methods=["POST"])
 @login_required
 @limiter.limit("30 per hour")
+@web_admin_required
 def unlock_user(user_id):
-    if not current_user.is_admin():
-        flash("Access denied.", "danger")
-        return redirect(url_for("main.dashboard"))
-
     target = User.query.get_or_404(user_id)
     if not target.is_locked():
         flash(f"User {target.username} is not locked.", "info")
@@ -684,12 +633,9 @@ def unlock_user(user_id):
         details={"target_username": target.username},
     )
 
-    try:
-        from app.email_utils import send_account_unlocked
+    from app.email_utils import send_account_unlocked
 
-        send_account_unlocked(target)
-    except Exception:
-        current_app.logger.exception("send_account_unlocked failed")
+    notify(send_account_unlocked, target)
 
     flash(f"User {target.username} has been unlocked.", "success")
     return redirect(url_for("auth.users"))
@@ -738,7 +684,7 @@ def setup_2fa():
 
             from app.email_utils import send_2fa_enabled
 
-            send_2fa_enabled(current_user)
+            notify(send_2fa_enabled, current_user)
 
             recovery_codes = _generate_recovery_codes(current_user)
 
@@ -787,7 +733,7 @@ def disable_2fa():
 
     from app.email_utils import send_2fa_disabled
 
-    send_2fa_disabled(current_user)
+    notify(send_2fa_disabled, current_user)
 
     log_audit(current_user.id, "2fa_disabled", "user", current_user.id)
     flash("Two-factor authentication disabled.", "success")
