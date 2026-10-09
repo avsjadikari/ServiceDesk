@@ -110,6 +110,16 @@
     color: #475569;
 }
 
+.badge-soft-info {
+    background: rgba(13, 202, 240, 0.12);
+    color: #0e7490;
+}
+
+.badge-soft-dark {
+    background: rgba(30, 41, 59, 0.12);
+    color: #1e293b;
+}
+
 [data-theme="dark"] .badge-soft-primary {
     color: #93c5fd;
     background: rgba(59, 130, 246, 0.2);
@@ -133,6 +143,16 @@
 [data-theme="dark"] .badge-soft-secondary {
     color: #cbd5e1;
     background: rgba(148, 163, 184, 0.2);
+}
+
+[data-theme="dark"] .badge-soft-info {
+    color: #67e8f9;
+    background: rgba(13, 202, 240, 0.2);
+}
+
+[data-theme="dark"] .badge-soft-dark {
+    color: #e2e8f0;
+    background: rgba(148, 163, 184, 0.15);
 }
 
 /* Kanban Board Layout */

@@ -164,7 +164,7 @@
                                 <button type="submit" class="btn btn-outline-primary btn-sm">{{ _('Apply') }}</button>
                             </form>
                             {% else %}
-                            <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
+                            <span class="badge bg-{{ ticket.status|status_color }}">
                                 {{ _(ticket.status) }}
                             </span>
                             {% endif %}
@@ -173,7 +173,7 @@
                     <tr>
                         <td><strong>{{ _('Priority') }}</strong></td>
                         <td>
-                            <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
+                            <span class="badge bg-{{ ticket.priority|priority_color }}">
                                 {{ _(ticket.priority) }}
                             </span>
                         </td>

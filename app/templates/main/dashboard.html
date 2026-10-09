@@ -217,7 +217,7 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge badge-soft badge-soft-{{ 'secondary' if ticket.status == 'closed' else 'success' if ticket.status == 'resolved' else 'primary' if ticket.status == 'new' else 'warning' }}">
+                                <span class="badge badge-soft badge-soft-{{ ticket.status|status_color }}">
                                     {{ _(ticket.status) }}
                                 </span>
                             </td>

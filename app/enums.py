@@ -12,3 +12,32 @@ STATUS_GLOSS = {
     "resolved": "we believe this is fixed — if it still isn't, say so and we'll reopen it",
     "closed": "this ticket is closed",
 }
+
+# Presentation for statuses/priorities: labels, badge colors. Single owner;
+# templates read these via Jinja filters, board.js via context-processed map.
+STATUS_LABELS = {
+    "new": "New",
+    "assigned": "Assigned",
+    "in_progress": "In Progress",
+    "pending": "Pending",
+    "resolved": "Resolved",
+    "closed": "Closed",
+}
+
+STATUS_COLORS = dict(
+    zip(
+        TICKET_STATUSES,
+        ("primary", "info", "warning", "secondary", "success", "dark"),
+    )
+)
+
+PRIORITY_COLORS = dict(
+    zip(TICKET_PRIORITIES, ("success", "warning", "danger", "danger"))
+)
+
+PRIORITY_LABELS = {
+    "low": "Low",
+    "medium": "Medium",
+    "high": "High",
+    "critical": "Critical",
+}

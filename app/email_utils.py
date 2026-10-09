@@ -223,6 +223,11 @@ def join_email_workers(timeout=30):
 
 
 def send_ticket_created(ticket):
+    """Notify the creator that their request landed and is owned by the team.
+
+    States the computed Expected Resolution (or none if SLA is unset) and
+    includes a track-it link; never promises a response time we don't enforce.
+    """
     sla_line = (
         f"Expected Resolution: {ticket.sla_deadline:%m/%d/%Y %H:%M}\n\n"
         if ticket.sla_deadline
@@ -243,6 +248,7 @@ def send_ticket_created(ticket):
 
 
 def send_ticket_assigned(ticket):
+    """Notify the assignee that they now own this ticket; no-op if unassigned."""
     if not ticket.assignee:
         return None
     subject = f"[{ticket.ticket_number}] Ticket Assigned to You"
@@ -259,7 +265,11 @@ def send_ticket_assigned(ticket):
     return send_email(ticket.assignee.email, subject, body)
 
 
-def send_ticket_status_changed(ticket, old_status, new_status):
+def send_ticket_status_changed(ticket, new_status):
+    """Notify the creator of a status move, translated via STATUS_GLOSS.
+
+    Plain-language meaning only — raw status slugs never reach end users.
+    """
     gloss = STATUS_GLOSS.get(new_status, new_status)
     subject = f"Ticket {ticket.ticket_number}: status update"
     body = (
@@ -274,6 +284,7 @@ def send_ticket_status_changed(ticket, old_status, new_status):
 
 
 def send_ticket_comment(ticket, comment):
+    """Notify the creator that a new (non-internal) comment landed on their ticket."""
     subject = f"[{ticket.ticket_number}] New Comment on Your Ticket"
     body = (
         f"A new comment has been added to your ticket:\n\n"

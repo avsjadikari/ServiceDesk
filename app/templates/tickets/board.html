@@ -136,13 +136,7 @@
         let sourceColumn = null;
         let pendingDrop = null;
 
-        const STATUS_LABELS = {
-            new: 'New & Triage',
-            assigned: 'Assigned',
-            in_progress: 'In Progress',
-            pending: 'Pending / Waiting',
-            resolved: 'Resolved'
-        };
+        const STATUS_LABELS = {{ STATUS_LABELS|tojson }};
 
         function updateColumnCounters() {
             document.querySelectorAll('.kanban-column').forEach(col => {

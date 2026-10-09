@@ -70,8 +70,8 @@
                     <tr>
                         <td><strong>Status</strong></td>
                         <td>
-                            <span class="badge bg-{{ 'primary' if ticket.status == 'new' else 'info' if ticket.status == 'assigned' else 'warning' if ticket.status in ['in_progress', 'pending'] else 'success' if ticket.status == 'resolved' else 'secondary' }}">
-                                {{ ticket.status }}
+                            <span class="badge bg-{{ ticket.status|status_color }}">
+                                {{ ticket.status|status_label }}
                             </span>
                             {% if status_gloss %}
                             <span class="text-muted small d-block mt-1">{{ status_gloss }}</span>
@@ -81,8 +81,8 @@
                     <tr>
                         <td><strong>Priority</strong></td>
                         <td>
-                            <span class="badge bg-{{ 'danger' if ticket.priority == 'critical' else 'warning' if ticket.priority == 'high' else 'info' if ticket.priority == 'medium' else 'success' }}">
-                                {{ ticket.priority }}
+                            <span class="badge bg-{{ ticket.priority|priority_color }}">
+                                {{ ticket.priority|priority_label }}
                             </span>
                         </td>
                     </tr>

@@ -203,6 +203,33 @@ def create_app(config_name=None):
             value = value.replace(tzinfo=timezone.utc).astimezone(zone)
         return value.strftime(fmt)
 
+    from app.enums import (
+        PRIORITY_COLORS,
+        PRIORITY_LABELS,
+        STATUS_COLORS,
+        STATUS_LABELS,
+    )
+
+    @app.template_filter("status_color")
+    def _status_color_filter(status):
+        return STATUS_COLORS.get(status, "secondary")
+
+    @app.template_filter("priority_color")
+    def _priority_color_filter(priority):
+        return PRIORITY_COLORS.get(priority, "secondary")
+
+    @app.template_filter("status_label")
+    def _status_label_filter(status):
+        return STATUS_LABELS.get(status, status)
+
+    @app.template_filter("priority_label")
+    def _priority_label_filter(priority):
+        return PRIORITY_LABELS.get(priority, priority)
+
+    @app.context_processor
+    def inject_status_labels():
+        return {"STATUS_LABELS": STATUS_LABELS}
+
     from app.i18n import i18n_bp, load_translations, t, _, SUPPORTED_LANGUAGES
 
     load_translations()

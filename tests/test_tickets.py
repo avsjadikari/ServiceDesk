@@ -1662,6 +1662,27 @@ class TestSearchAndNavActive:
             assert resp.data.count(b'class="nav-link active"') == 1
 
 
+class TestStatusPresentation:
+    def test_single_owner_covers_every_status_and_priority(self):
+        from app.enums import (
+            PRIORITY_COLORS,
+            PRIORITY_LABELS,
+            STATUS_COLORS,
+            STATUS_LABELS,
+            TICKET_PRIORITIES,
+            TICKET_STATUSES,
+        )
+
+        assert set(STATUS_LABELS) == set(TICKET_STATUSES)
+        assert set(STATUS_COLORS) == set(TICKET_STATUSES)
+        assert set(PRIORITY_LABELS) == set(TICKET_PRIORITIES)
+        assert set(PRIORITY_COLORS) == set(TICKET_PRIORITIES)
+
+    def test_badge_filters_registered(self, app):
+        for name in ("status_color", "priority_color", "status_label", "priority_label"):
+            assert name in app.jinja_env.filters
+
+
 class TestReassuranceCopy:
     def test_status_gloss_covers_all_statuses(self):
         from app.enums import STATUS_GLOSS, TICKET_STATUSES

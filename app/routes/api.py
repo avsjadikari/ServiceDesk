@@ -11,8 +11,6 @@ from app.utils import (
     build_ticket,
     get_ticket_metrics,
     calculate_sla_compliance,
-    get_status_color,
-    get_priority_color,
     log_audit,
 )
 

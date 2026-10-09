@@ -119,26 +119,6 @@ def log_ticket_audit(ticket, action, details=None, commit=True):
     )
 
 
-def get_status_color(status):
-    colors = {
-        s: c
-        for s, c in zip(
-            TICKET_STATUSES, ("primary", "info", "warning", "secondary", "success", "dark")
-        )
-    }
-    return colors.get(status, "secondary")
-
-
-def get_priority_color(priority):
-    colors = {
-        s: c
-        for s, c in zip(
-            TICKET_PRIORITIES, ("success", "warning", "danger", "danger")
-        )
-    }
-    return colors.get(priority, "secondary")
-
-
 def apply_automation_rules(ticket, trigger_type):
     from app.models import AutomationRule
 

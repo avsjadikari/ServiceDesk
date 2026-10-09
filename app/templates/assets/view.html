@@ -96,7 +96,7 @@
                         <tr>
                             <td><a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a></td>
                             <td>{{ ticket.title[:40] }}…</td>
-                            <td>{{ ticket.status }}</td>
+                            <td>{{ ticket.status|status_label }}</td>
                         </tr>
                         {% endfor %}
                     </tbody>

@@ -21,14 +21,17 @@ from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
 from app import db
-from app.enums import TICKET_STATUSES
+from app.enums import (
+    PRIORITY_COLORS,
+    STATUS_COLORS,
+    STATUS_LABELS,
+    TICKET_STATUSES,
+)
 from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
 from app.models import Attachment, Comment, Ticket, User
 from app.utils import (
     apply_automation_rules,
     build_ticket,
-    get_priority_color,
-    get_status_color,
     log_ticket_audit,
     validate_upload_sniff,
 )
@@ -58,16 +61,6 @@ def _notify(ticket, description, send_fn, *args):
             "Email send failed for ticket %s (%s)", ticket.id, description,
             exc_info=True,
         )
-
-
-STATUS_LABELS = {
-    "new": "New",
-    "assigned": "Assigned",
-    "in_progress": "In Progress",
-    "pending": "Pending",
-    "resolved": "Resolved",
-    "closed": "Closed",
-}
 
 
 def _apply_status_timestamps(ticket, new_status):
@@ -223,8 +216,8 @@ def view(ticket_id):
         .all()
     )
 
-    status_color = get_status_color(ticket.status)
-    priority_color = get_priority_color(ticket.priority)
+    status_color = STATUS_COLORS.get(ticket.status, "secondary")
+    priority_color = PRIORITY_COLORS.get(ticket.priority, "secondary")
 
     return render_template(
         "tickets/view.html",
@@ -298,7 +291,7 @@ def update_status(ticket_id):
 
     from app.email_utils import send_ticket_status_changed
 
-    _notify(ticket, "status change", send_ticket_status_changed, old_status, new_status)
+    _notify(ticket, "status change", send_ticket_status_changed, new_status)
 
     if request.is_json:
         return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
