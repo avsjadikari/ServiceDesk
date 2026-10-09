@@ -52,7 +52,7 @@ def _to_int(value):
 def _notify(ticket, description, send_fn, *args):
     """A failing email must not fail the request; log and continue."""
     try:
-        send_fn(*args)
+        send_fn(ticket, *args)
     except Exception:
         current_app.logger.warning(
             "Email send failed for ticket %s (%s)", ticket.id, description,

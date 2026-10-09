@@ -1714,5 +1714,6 @@ class TestReassuranceCopy:
                     f"/tickets/{ticket.id}/update-status", data={"status": "in_progress"}
                 )
             body = send.call_args.args[2]
+            assert "TKT-320001" in body
             assert "a support person is actively working on it" in body.lower()
             assert "in_progress" not in send.call_args.args[1]
