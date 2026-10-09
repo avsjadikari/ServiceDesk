@@ -1,10 +1,27 @@
 """HTTP error handlers."""
 
-from flask import flash, jsonify, redirect, request, url_for
+from flask import flash, jsonify, redirect, render_template, request, url_for
 from werkzeug.exceptions import RequestEntityTooLarge
 
 
 def register_error_handlers(app) -> None:
+    def _render_error(code, message):
+        if request.path.startswith("/api/"):
+            return jsonify({"error": message}), code
+        return render_template("errors/error.html", code=code, message=message), code
+
+    @app.errorhandler(403)
+    def handle_forbidden(exc):
+        return _render_error(403, "You don't have permission to access this page.")
+
+    @app.errorhandler(404)
+    def handle_not_found(exc):
+        return _render_error(404, "We couldn't find the page you were looking for.")
+
+    @app.errorhandler(500)
+    def handle_server_error(exc):
+        return _render_error(500, "Something went wrong on our end. Please try again.")
+
     @app.errorhandler(RequestEntityTooLarge)
     def handle_request_too_large(exc):
         from urllib.parse import urlsplit

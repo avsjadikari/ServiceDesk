@@ -13,6 +13,8 @@ db = SQLAlchemy()
 login_manager = LoginManager()
 csrf = CSRFProtect()
 migrate = Migrate()
+# ponytail: blanket per-IP guard only. A NAT'd office shares one budget, so
+# keep this generous and leave the tight limits on auth/write endpoints.
 limiter = Limiter(
-    key_func=get_remote_address, default_limits=["200 per day", "50 per hour"]
+    key_func=get_remote_address, default_limits=["1000 per hour", "10000 per day"]
 )

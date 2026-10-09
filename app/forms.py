@@ -1,3 +1,5 @@
+import re
+
 from flask_wtf import FlaskForm
 from wtforms import (
     StringField,
@@ -11,7 +13,6 @@ from wtforms import (
 )
 from wtforms.validators import (
     DataRequired,
-    Email,
     EqualTo,
     Length,
     NumberRange,
@@ -30,6 +31,31 @@ _PASSWORD_REGEX_MSG = (
 _PASSWORD_REGEX = (
     r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]"
 )
+
+_INTERNAL_EMAIL_RE = re.compile(
+    r"^[^@\s]+@[^@\s]+\.(?:local|internal|lan|corp|home|intranet)$", re.I
+)
+
+
+def email_allow_internal(form, field):
+    """Email() but also accepts internal-only domains like ``.local``.
+
+    email_validator rejects special-use/reserved TLDs outright, yet help
+    desks routinely run on ``.local``/``.internal`` names, so fall back to
+    a lenient check for those known-internal domains only.
+    """
+    value = (field.data or "").strip()
+    try:
+        import email_validator
+    except ImportError:
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", value):
+            raise ValidationError("Invalid email address.")
+        return
+    try:
+        email_validator.validate_email(value, check_deliverability=False)
+    except email_validator.EmailNotValidError:
+        if not _INTERNAL_EMAIL_RE.match(value):
+            raise ValidationError("Invalid email address.")
 
 
 class SetupForm(FlaskForm):
@@ -55,7 +81,7 @@ class SetupForm(FlaskForm):
     admin_username = StringField(
         "Admin Username", validators=[DataRequired(), Length(min=3, max=64)]
     )
-    admin_email = StringField("Admin Email", validators=[DataRequired(), Email()])
+    admin_email = StringField("Admin Email", validators=[DataRequired(), email_allow_internal])
     admin_full_name = StringField(
         "Admin Full Name", validators=[DataRequired(), Length(max=128)]
     )
@@ -74,7 +100,7 @@ class RegistrationForm(FlaskForm):
     username = StringField(
         "Username", validators=[DataRequired(), Length(min=3, max=64)]
     )
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    email = StringField("Email", validators=[DataRequired(), email_allow_internal])
     full_name = StringField("Full Name", validators=[DataRequired(), Length(max=128)])
     department = StringField("Department", validators=[Optional(), Length(max=64)])
     phone = StringField("Phone", validators=[Optional(), Length(max=20)])
@@ -126,7 +152,7 @@ class UserEditForm(FlaskForm):
     username = StringField(
         "Username", validators=[DataRequired(), Length(min=3, max=64)]
     )
-    email = StringField("Email", validators=[DataRequired(), Email()])
+    email = StringField("Email", validators=[DataRequired(), email_allow_internal])
     full_name = StringField("Full Name", validators=[DataRequired(), Length(max=128)])
     department = StringField("Department", validators=[Optional(), Length(max=64)])
     phone = StringField("Phone", validators=[Optional(), Length(max=20)])
@@ -348,7 +374,7 @@ class AutomationRuleForm(FlaskForm):
 
 
 class ForgotPasswordForm(FlaskForm):
-    email = StringField("Email", validators=[DataRequired(), Email(), Length(max=120)])
+    email = StringField("Email", validators=[DataRequired(), email_allow_internal, Length(max=120)])
 
 
 class ResetPasswordForm(FlaskForm):
@@ -458,5 +484,5 @@ class MailSettingsForm(FlaskForm):
 class TestEmailForm(FlaskForm):
     recipient = StringField(
         "Send test email to",
-        validators=[DataRequired(), Email(), Length(max=255)],
+        validators=[DataRequired(), email_allow_internal, Length(max=255)],
     )

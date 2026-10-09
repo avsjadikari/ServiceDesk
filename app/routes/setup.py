@@ -132,6 +132,10 @@ def wizard():
 
         db.session.commit()
 
+        from app.seed import _log_generated_credentials
+
+        _log_generated_credentials(demo_passwords)
+
         session["setup_complete"] = True
         session["company_name"] = company_name
         session["setup_temp_passwords"] = demo_passwords

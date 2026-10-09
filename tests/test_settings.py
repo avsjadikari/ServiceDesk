@@ -21,13 +21,13 @@ def fresh_settings(db):
 
 
 class TestCompanyNameDisplay:
-    """The display name must always be ``<stored> ServiceDesk``."""
+    """The display name is ``<stored> ServiceDesk``, never doubled."""
 
-    def test_default_display_uses_servicedesk_suffix(self, app, fresh_settings):
+    def test_default_display_is_single_brand(self, app, fresh_settings):
         from app.settings_store import display_company_name
 
         with app.app_context():
-            assert display_company_name() == "ServiceDesk ServiceDesk"
+            assert display_company_name() == "ServiceDesk"
 
     def test_stored_name_gets_suffix(self, app, fresh_settings):
         from app.settings_store import display_company_name, set_company_name
@@ -45,6 +45,13 @@ class TestCompanyNameDisplay:
             set_company_name("Globex")
             assert display_company_name() == "Globex ServiceDesk"
 
+    def test_suffix_not_applied_twice(self, app, fresh_settings):
+        from app.settings_store import display_company_name, set_company_name
+
+        with app.app_context():
+            set_company_name("Acme ServiceDesk")
+            assert display_company_name() == "Acme ServiceDesk"
+
     def test_blank_storage_falls_back(self, app, fresh_settings, db):
         from app.settings_store import display_company_name
 
@@ -52,7 +59,7 @@ class TestCompanyNameDisplay:
             row = SystemSetting(key="company_name", value="   ")
             db.session.add(row)
             db.session.commit()
-            assert display_company_name() == "ServiceDesk ServiceDesk"
+            assert display_company_name() == "ServiceDesk"
 
     def test_strip_whitespace_on_set(self, app, fresh_settings):
         from app.settings_store import get_company_name, set_company_name

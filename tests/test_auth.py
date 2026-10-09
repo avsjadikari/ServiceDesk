@@ -1482,3 +1482,30 @@ class TestTwoFactorSetupAndDisable:
             ).count()
             == 1
         )
+
+
+class TestInternalEmailValidator:
+    """``email_allow_internal`` accepts .local intranet domains, rejects junk."""
+
+    class _Field:
+        def __init__(self, data):
+            self.data = data
+
+    def test_accepts_local_domain(self):
+        from app.forms import email_allow_internal
+
+        email_allow_internal(None, self._Field("admin@acme.local"))
+
+    def test_rejects_garbage(self):
+        from app.forms import email_allow_internal
+        from wtforms.validators import ValidationError
+
+        with pytest.raises(ValidationError):
+            email_allow_internal(None, self._Field("not-an-email"))
+
+    def test_rejects_domainless(self):
+        from app.forms import email_allow_internal
+        from wtforms.validators import ValidationError
+
+        with pytest.raises(ValidationError):
+            email_allow_internal(None, self._Field("a@local"))

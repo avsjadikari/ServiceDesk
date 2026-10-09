@@ -395,7 +395,7 @@
                         {% for code, lang_info in supported_languages.items() %}
                         <li>
                             <a class="dropdown-item d-flex align-items-center justify-content-between {% if code == current_lang %}active{% endif %}" href="{{ url_for('i18n.set_language', lang_code=code) }}">
-                                <span>{{ lang_info.flag }} {{ lang_info.native }} <small class="text-muted">({{ lang_info.name }})</small></span>
+                                <span>{{ lang_info.flag }} {{ lang_info.native }}{% if lang_info.name != lang_info.native %} <small class="text-muted">({{ lang_info.name }})</small>{% endif %}</span>
                                 {% if code == current_lang %}
                                 <i class="bi bi-check2 ms-2"></i>
                                 {% endif %}

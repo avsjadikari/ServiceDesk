@@ -132,6 +132,8 @@ def display_company_name():
     raw = (get_company_name() or "").strip()
     if not raw:
         raw = DEFAULT_COMPANY_NAME
+    if raw == DEFAULT_COMPANY_NAME or raw.endswith(PRODUCT_SUFFIX):
+        return raw
     return f"{raw}{PRODUCT_SUFFIX}"
 
 
