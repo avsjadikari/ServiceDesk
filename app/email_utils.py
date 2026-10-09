@@ -43,7 +43,11 @@ class MailSendError(Exception):
 
 
 def init_mail(app):
-    mail.init_app(app)
+    # flask_mail 0.9.1: init_app stores the state in app.extensions['mail']
+    # but never assigns .state when the instance was created without an app.
+    # _refresh_mail_state() and the Connection read the state; keep both
+    # pointing at the same object.
+    mail.state = mail.init_app(app)
 
 
 def _resolve_sender():

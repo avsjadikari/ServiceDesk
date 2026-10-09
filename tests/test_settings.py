@@ -225,6 +225,37 @@ class TestMailSettings:
             assert app.config["MAIL_USE_TLS"] is True
             assert app.config["MAIL_USERNAME"] == "ops@acme.com"
 
+    def test_saved_mail_config_reaches_flask_mail_state(
+        self, client, app, db, admin_user, fresh_settings
+    ):
+        # Regression: _refresh_mail_state() writes to mail.state, but
+        # flask_mail 0.9.1 leaves .state None when Mail() is created without
+        # an app — the live creds never reached the Connection, so SMTP
+        # AUTH was never attempted (Gmail 530). init_mail must keep
+        # mail.state pointing at app.extensions['mail'].
+        from app.email_utils import mail
+
+        with app.app_context():
+            client.post(
+                "/login",
+                data={"username": "admin", "password": "Admin@123456"},
+            )
+            client.post(
+                "/settings/mail",
+                data={
+                    "mail_server": "smtp.gmail.com",
+                    "mail_port": "587",
+                    "mail_use_tls": "y",
+                    "mail_username": "smtp_user@gmail.com",
+                    "mail_password": "apppass-12345678",
+                },
+            )
+            state = app.extensions.get("mail")
+            assert mail.state is not None
+            assert mail.state is state
+            assert state.username == "smtp_user@gmail.com"
+            assert state.password == "apppass-12345678"
+
     def test_blank_password_keeps_existing_secret(
         self, client, app, db, admin_user, fresh_settings
     ):
