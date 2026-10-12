@@ -1,8 +1,8 @@
 /* Modern ServiceDesk Design System Extensions */
 
 :root {
-    --transition-fast: 0.15s ease;
-    --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 0.16s var(--ease-out-expo);
+    --transition-smooth: 0.3s var(--ease-out-quart);
     --radius-sm: 0.375rem;
     --radius-md: 0.625rem;
     --radius-lg: 0.875rem;
