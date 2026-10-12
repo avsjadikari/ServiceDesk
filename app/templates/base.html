@@ -46,25 +46,25 @@
         }
 
         [data-theme="blue"] {
-            --primary: #2563eb;
+            --primary: #3b82f6;
             --navbar-bg: linear-gradient(135deg, #1e293b 0%, #334155 100%);
         }
 
         [data-theme="green"] {
-            --primary: #059669;
-            --success: #10b981;
+            --primary: #22c55e;
+            --success: #34d399;
             --navbar-bg: linear-gradient(135deg, #064e3b 0%, #047857 100%);
         }
 
         [data-theme="purple"] {
-            --primary: #7c3aed;
+            --primary: #8b5cf6;
             --success: #10b981;
             --navbar-bg: linear-gradient(135deg, #4c1d95 0%, #6d28d9 100%);
         }
 
         [data-theme="red"] {
-            --primary: #dc2626;
-            --danger: #ef4444;
+            --primary: #f87171;
+            --danger: #f87171;
             --navbar-bg: linear-gradient(135deg, #7f1d1d 0%, #b91c1c 100%);
         }
 
@@ -95,8 +95,13 @@
 
         body {
             font-family: var(--font-body);
+            font-size: clamp(0.95rem, 0.92rem + 0.15vw, 1rem);
+            line-height: 1.65;
             background-color: var(--light);
             color: var(--text-primary);
+            text-rendering: optimizeLegibility;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
         }
 
         .navbar {
@@ -146,6 +151,7 @@
             border-bottom: 1px solid var(--card-border);
             font-family: var(--font-display);
             font-weight: 600;
+            letter-spacing: -0.01em;
         }
 
         .btn-primary {
@@ -154,7 +160,7 @@
         }
 
         .btn-primary:hover {
-            filter: brightness(90%);
+            filter: brightness(95%);
             border-color: var(--primary);
         }
 
@@ -167,10 +173,30 @@
             color: var(--text-primary);
         }
 
+        h1, h2, h3, h4, h5, h6 {
+            font-family: var(--font-display);
+            color: var(--text-primary);
+            letter-spacing: -0.02em;
+            line-height: 1.15;
+            text-wrap: balance;
+        }
+        h1 { font-size: clamp(2rem, 1.6rem + 2vw, 2.75rem); }
+        h2 { font-size: clamp(1.5rem, 1.3rem + 1vw, 2rem); }
+        h3 { font-size: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem); }
+        h4 { font-size: clamp(1.125rem, 1.08rem + 0.25vw, 1.25rem); }
+        .h3 { font-size: clamp(1.25rem, 1.15rem + 0.5vw, 1.5rem); }
+
+        .form-label, .small, label {
+            font-size: clamp(0.85rem, 0.83rem + 0.1vw, 0.925rem);
+            letter-spacing: 0.01em;
+        }
+
         .table th {
             font-weight: 500;
             color: var(--text-secondary);
-            font-size: 0.875rem;
+            font-size: clamp(0.8rem, 0.78rem + 0.1vw, 0.875rem);
+            letter-spacing: 0.03em;
+            text-transform: uppercase;
             border-color: var(--card-border) !important;
         }
 
@@ -210,7 +236,7 @@
 
         .metric-card h2 {
             font-family: var(--font-display);
-            font-size: 2.25rem;
+            font-size: clamp(2rem, 1.8rem + 1.5vw, 2.5rem);
             letter-spacing: -0.02em;
             font-variant-numeric: tabular-nums;
         }
@@ -229,6 +255,16 @@
             animation: sd-rise 0.5s var(--ease-out-expo) both;
         }
 
+        .stagger:nth-child(1) { animation-delay: 0ms; }
+        .stagger:nth-child(2) { animation-delay: 40ms; }
+        .stagger:nth-child(3) { animation-delay: 80ms; }
+        .stagger:nth-child(4) { animation-delay: 120ms; }
+        .stagger:nth-child(5) { animation-delay: 160ms; }
+        .stagger:nth-child(6) { animation-delay: 200ms; }
+        .stagger {
+            animation: sd-rise 0.5s var(--ease-out-expo) both;
+        }
+
         @keyframes sd-rise {
             from { opacity: 0; transform: translateY(8px); }
             to { opacity: 1; transform: none; }
@@ -241,6 +277,7 @@
                 transition-duration: 0.01ms !important;
             }
             .main-content { animation: none; }
+            .stagger { animation-delay: 0s !important; }
         }
 
         .page-header {
