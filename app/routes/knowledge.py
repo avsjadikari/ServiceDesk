@@ -126,7 +126,10 @@ def edit(article_id):
         db.session.commit()
 
         flash(f'Article "{article.title}" updated successfully.', "success")
-        return redirect(url_for("knowledge.view", article_id=article.id))
+        if article.status == "published":
+            return redirect(url_for("knowledge.view", article_id=article.id))
+        else:
+            return redirect(url_for("knowledge.index"))
 
     return render_template("knowledge/edit.html", form=form, article=article)
 
