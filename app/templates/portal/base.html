@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ current_lang }}" dir="{{ current_lang_dir }}">
+<html lang="{{ current_lang }}" dir="{{ current_lang_dir }}" data-bs-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -235,18 +235,27 @@
         (function() {
             const savedTheme = localStorage.getItem('theme') || 'blue';
             document.body.setAttribute('data-theme', savedTheme);
-            document.documentElement.style.colorScheme = savedTheme === 'dark' ? 'dark' : 'light';
+            applyColorScheme(savedTheme);
             updateThemeButtons(savedTheme);
 
             document.querySelectorAll('.theme-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const theme = this.getAttribute('data-theme');
                     document.body.setAttribute('data-theme', theme);
-                    document.documentElement.style.colorScheme = theme === 'dark' ? 'dark' : 'light';
+                    applyColorScheme(theme);
                     localStorage.setItem('theme', theme);
                     updateThemeButtons(theme);
                 });
             });
+
+            // Bootstrap 5.3 has its own dark mode; mirror the app theme onto
+            // it so built-in components (card-text, list-group, breadcrumb…)
+            // don't keep their light-mode gray on our dark surfaces.
+            function applyColorScheme(theme) {
+                const dark = theme === 'dark';
+                document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+                document.documentElement.setAttribute('data-bs-theme', dark ? 'dark' : 'light');
+            }
 
             function updateThemeButtons(activeTheme) {
                 document.querySelectorAll('.theme-btn').forEach(btn => {

@@ -299,3 +299,23 @@ class TestAsyncEmail:
 
             join_email_workers(timeout=5)
             assert len(outbox) == 2
+
+
+class TestDarkThemeBootstrapSync:
+    """Regression: dark mode left Bootstrap components' text dark-on-dark.
+
+    Bootstrap sets .card/.list-group/.dropdown-menu colour from its own
+    --bs-body-color, which only lightens under data-bs-theme="dark". The app
+    never set that, so component text stayed #212529 on our dark surfaces.
+    """
+
+    def test_main_shell_syncs_bootstrap_theme(self, client, app):
+        body = client.get("/login").get_data(as_text=True)
+        assert 'data-bs-theme="light"' in body
+        assert "data-bs-theme" in body
+        assert "applyColorScheme" in body
+
+    def test_portal_shell_syncs_bootstrap_theme(self, client):
+        body = client.get("/portal/home").get_data(as_text=True)
+        assert 'data-bs-theme="light"' in body
+        assert "applyColorScheme" in body
