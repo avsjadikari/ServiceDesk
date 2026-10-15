@@ -42,6 +42,9 @@
                 </h5>
                 <p class="card-text text-muted">{{ article.content[:150] }}…</p>
                 <div class="d-flex gap-2">
+                    {% if article.status != 'published' %}
+                    <span class="badge bg-warning text-dark">{{ article.status|capitalize }}</span>
+                    {% endif %}
                     <span class="badge bg-secondary">{{ article.category }}</span>
                     {% if article.tags %}
                         {% for tag in article.tags[:3] %}

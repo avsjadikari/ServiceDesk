@@ -420,3 +420,67 @@ class TestPortalKnowledgeCharacterization:
         assert resp.status_code == 200
         with app.app_context():
             assert Article.query.get(aid).view_count == 1  # CHARACTERIZED: view_count increment on GET
+
+
+class TestDraftArticleRecoverable:
+    """Regression: saving an article as draft made it unreachable — index and
+    view both filtered status=='published' for everyone, so an agent's own
+    draft disappeared with no way back."""
+
+    def _agent_draft(self, app, db, agent_user):
+        with app.app_context():
+            a = Article(
+                title="DraftToRecover",
+                content="body",
+                category="Software",
+                author_id=agent_user.id,
+                status="draft",
+            )
+            db.session.add(a)
+            db.session.commit()
+            return a.id
+
+    def test_agent_can_view_own_draft(self, client, app, db, agent_user):
+        aid = self._agent_draft(app, db, agent_user)
+        with app.app_context():
+            client.post("/login", data={"username": "agent", "password": "Agent@123456"})
+        assert client.get(f"/knowledge/{aid}").status_code == 200
+
+    def test_draft_not_viewable_anonymously(self, client, app, db, agent_user):
+        aid = self._agent_draft(app, db, agent_user)
+        assert client.get(f"/knowledge/{aid}").status_code == 404
+
+    def test_draft_listed_for_agent(self, client, app, db, agent_user):
+        self._agent_draft(app, db, agent_user)
+        with app.app_context():
+            client.post("/login", data={"username": "agent", "password": "Agent@123456"})
+        authed = client.get("/knowledge")
+        assert ">DraftToRecover<" in authed.get_data(as_text=True)
+
+    def test_draft_hidden_from_anonymous(self, client, app, db, agent_user):
+        self._agent_draft(app, db, agent_user)
+        anon = client.get("/knowledge")
+        assert ">DraftToRecover<" not in anon.get_data(as_text=True)
+
+    def test_edit_published_to_draft_stays_reachable(self, client, app, db, agent_user):
+        """The reported symptom: change status -> draft, update -> 404 + vanish."""
+        with app.app_context():
+            a = Article(
+                title="FlipMe",
+                content="body",
+                category="Software",
+                author_id=agent_user.id,
+                status="published",
+            )
+            db.session.add(a)
+            db.session.commit()
+            aid = a.id
+            client.post("/login", data={"username": "agent", "password": "Agent@123456"})
+        resp = client.post(
+            f"/knowledge/{aid}/edit",
+            data={"title": "FlipMe", "content": "body", "category": "Software",
+                  "tags": "", "status": "draft"},
+            follow_redirects=True,
+        )
+        assert resp.status_code == 200
+        assert client.get(f"/knowledge/{aid}").status_code == 200

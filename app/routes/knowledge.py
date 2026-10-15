@@ -13,7 +13,12 @@ knowledge = Blueprint("knowledge", __name__)
 def index():
     form = ArticleSearchForm()
 
-    query = Article.query.filter_by(status="published")
+    # Agents/admins manage all articles (incl. drafts/archived); everyone
+    # else only sees published ones. Without this a saved draft would
+    # vanish from the list with no way back to it.
+    query = Article.query
+    if not (current_user.is_authenticated and current_user.is_agent()):
+        query = query.filter_by(status="published")
 
     search = request.args.get("search")
     category = request.args.get("category")
@@ -40,12 +45,13 @@ def index():
 
 @knowledge.route("/knowledge/<int:article_id>")
 def view(article_id):
-    article = (
-        Article.query.options(joinedload(Article.author))
-        .filter(
-            Article.id == article_id, Article.status == "published"
-        ).first_or_404()
+    # Agents/admins can preview any status; the public only published.
+    query = Article.query.options(joinedload(Article.author)).filter(
+        Article.id == article_id
     )
+    if not (current_user.is_authenticated and current_user.is_agent()):
+        query = query.filter(Article.status == "published")
+    article = query.first_or_404()
     article.view_count += 1
     db.session.commit()
 
@@ -126,10 +132,7 @@ def edit(article_id):
         db.session.commit()
 
         flash(f'Article "{article.title}" updated successfully.', "success")
-        if article.status == "published":
-            return redirect(url_for("knowledge.view", article_id=article.id))
-        else:
-            return redirect(url_for("knowledge.index"))
+        return redirect(url_for("knowledge.view", article_id=article.id))
 
     return render_template("knowledge/edit.html", form=form, article=article)
 
