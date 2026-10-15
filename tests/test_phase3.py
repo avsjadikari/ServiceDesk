@@ -314,8 +314,12 @@ class TestDarkThemeBootstrapSync:
         assert 'data-bs-theme="light"' in body
         assert "data-bs-theme" in body
         assert "applyColorScheme" in body
+        # Dark link colour must skip anchor-buttons or a.btn text goes
+        # blue-on-blue against the primary background.
+        assert "a:not(.btn)" in body
 
     def test_portal_shell_syncs_bootstrap_theme(self, client):
         body = client.get("/portal/home").get_data(as_text=True)
         assert 'data-bs-theme="light"' in body
         assert "applyColorScheme" in body
+        assert "a:not(.btn)" in body

@@ -393,7 +393,9 @@
             border-color: #334155;
         }
 
-        [data-theme="dark"] a {
+        /* Anchor-based buttons (a.btn) keep their own btn colour; without
+           :not(.btn) this turned their text the same blue as the button. */
+        [data-theme="dark"] a:not(.btn) {
             color: #3b82f6;
         }
 
