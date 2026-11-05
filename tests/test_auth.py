@@ -533,6 +533,45 @@ class TestAdminAccountManagement:
             )
             assert response.status_code == 302
 
+    def test_edit_user_prevents_self_deactivation(
+        self, client, app, db, admin_user
+    ):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            response = client.post(
+                f"/users/{admin_user.id}/edit",
+                data={
+                    "username": admin_user.username,
+                    "email": admin_user.email,
+                    "full_name": admin_user.full_name,
+                    "department": admin_user.department or "",
+                    "phone": admin_user.phone or "",
+                    "role": "admin",
+                },
+            )
+            assert response.status_code == 200
+            assert b"You cannot deactivate your own account." in response.data
+
+    def test_edit_user_prevents_demoting_last_admin(
+        self, client, app, db, admin_user
+    ):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            response = client.post(
+                f"/users/{admin_user.id}/edit",
+                data={
+                    "username": admin_user.username,
+                    "email": admin_user.email,
+                    "full_name": admin_user.full_name,
+                    "department": admin_user.department or "",
+                    "phone": admin_user.phone or "",
+                    "role": "agent",
+                    "is_active": "y",
+                },
+            )
+            assert response.status_code == 200
+            assert b"Cannot demote the last active admin." in response.data
+
 
 class TestRecoveryCodes:
     """Regression: recovery codes must use a real stdlib primitive."""

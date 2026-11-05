@@ -27,7 +27,7 @@ class User(UserMixin, db.Model):
     role = db.Column(db.String(20), default="user", index=True)
     department = db.Column(db.String(64))
     phone = db.Column(db.String(20))
-    is_active = db.Column(db.Boolean, default=True)
+    is_active = db.Column(db.Boolean, default=True, index=True)
     must_change_password = db.Column(db.Boolean, default=False)
     two_factor_enabled = db.Column(db.Boolean, default=False)
     two_factor_secret = db.Column(db.String(32))
@@ -181,7 +181,9 @@ class Ticket(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
 
-    asset_id = db.Column(db.Integer, db.ForeignKey("assets.id", ondelete="SET NULL"))
+    asset_id = db.Column(
+        db.Integer, db.ForeignKey("assets.id", ondelete="SET NULL"), index=True
+    )
 
     sla_deadline = db.Column(db.DateTime, index=True)
     first_response_at = db.Column(db.DateTime)
@@ -347,7 +349,7 @@ class Attachment(db.Model):
     filepath = db.Column(db.String(512), nullable=False)
     file_size = db.Column(db.Integer)
     mime_type = db.Column(db.String(100))
-    uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    uploaded_by = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
 
     uploader = db.relationship("User", foreign_keys=[uploaded_by])
@@ -369,11 +371,13 @@ class AuditLog(db.Model):
     __tablename__ = "audit_logs"
 
     id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey("users.id"))
-    action = db.Column(db.String(50), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
+    action = db.Column(db.String(50), nullable=False, index=True)
     entity_type = db.Column(db.String(50))
     entity_id = db.Column(db.Integer)
-    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id", ondelete="SET NULL"))
+    ticket_id = db.Column(
+        db.Integer, db.ForeignKey("tickets.id", ondelete="SET NULL"), index=True
+    )
     details = db.Column(db.JSON)
     ip_address = db.Column(db.String(45))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
@@ -394,7 +398,7 @@ class AutomationRule(db.Model):
     trigger_conditions = db.Column(db.JSON)
     action_type = db.Column(db.String(50), nullable=False)
     action_config = db.Column(db.JSON)
-    is_active = db.Column(db.Boolean, default=True)
+    is_active = db.Column(db.Boolean, default=True, index=True)
     priority = db.Column(db.Integer, default=0)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
     updated_at = db.Column(

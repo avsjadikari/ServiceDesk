@@ -414,6 +414,16 @@ def edit_user(user_id):
     form = UserEditForm(obj=user, editing_user_id=user.id)
 
     if form.validate_on_submit():
+        if user.id == current_user.id and not form.is_active.data:
+            flash("You cannot deactivate your own account.", "danger")
+            return render_template("auth/edit_user.html", form=form, user=user)
+
+        if user.role == "admin" and form.role.data != "admin":
+            admin_count = User.query.filter_by(role="admin", is_active=True).count()
+            if admin_count <= 1:
+                flash("Cannot demote the last active admin.", "danger")
+                return render_template("auth/edit_user.html", form=form, user=user)
+
         user.username = form.username.data
         user.email = form.email.data
         user.full_name = form.full_name.data

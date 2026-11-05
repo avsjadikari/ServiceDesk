@@ -18,6 +18,10 @@ def register_error_handlers(app) -> None:
     def handle_not_found(exc):
         return _render_error(404, "We couldn't find the page you were looking for.")
 
+    @app.errorhandler(429)
+    def handle_rate_limit(exc):
+        return _render_error(429, "Too many requests. Please slow down and try again later.")
+
     @app.errorhandler(500)
     def handle_server_error(exc):
         return _render_error(500, "Something went wrong on our end. Please try again.")

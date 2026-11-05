@@ -409,6 +409,52 @@ class TestTicketAssignment:
             assert f'value="{agent_user.id}"'.encode() in response.data
             assert f'value="{admin_user.id}"'.encode() in response.data
 
+    def test_assign_dropdown_excludes_inactive_agents_except_current_assignee(
+        self, client, app, db, admin_user, agent_user
+    ):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            inactive_agent = User(
+                username="inactive_agent_test",
+                email="inactive_agent@servicedesk.local",
+                full_name="Inactive Agent",
+                role="agent",
+                is_active=False,
+            )
+            inactive_agent.set_password("Agent@123456")
+            db.session.add(inactive_agent)
+            db.session.commit()
+
+            # /tickets/new must NOT list inactive agent
+            res_new = client.get("/tickets/new")
+            assert res_new.status_code == 200
+            assert b"Inactive Agent" not in res_new.data
+
+            # Ticket assigned to inactive agent
+            ticket = Ticket(
+                ticket_number="TKT-000007",
+                title="Inactive Assignee Ticket",
+                description="Test description",
+                created_by=admin_user.id,
+                assigned_to=inactive_agent.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            # /tickets/<id>/edit must list the inactive assignee
+            res_edit = client.get(f"/tickets/{ticket.id}/edit")
+            assert res_edit.status_code == 200
+            assert b"Inactive Agent (Inactive)" in res_edit.data
+
+            # /tickets/<id> view dropdown must also list inactive assignee
+            res_view = client.get(f"/tickets/{ticket.id}")
+            assert res_view.status_code == 200
+            assert b"Inactive Agent (Inactive)" in res_view.data
+
 
 class TestKanbanBoard:
     """Test Kanban board functionality and JSON status update"""

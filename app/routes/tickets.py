@@ -40,8 +40,16 @@ tickets = Blueprint("tickets", __name__)
 SNIFF_LENGTH = 512
 
 
-def _agent_users():
-    return User.query.filter(User.role.in_(["agent", "admin"])).all()
+def _agent_users(include_user=None):
+    users = (
+        User.query.filter(User.role.in_(["agent", "admin"]), User.is_active.is_(True))
+        .order_by(User.full_name.asc())
+        .all()
+    )
+    if include_user and not any(u.id == include_user.id for u in users):
+        users.append(include_user)
+        users.sort(key=lambda u: (u.full_name or u.username or "").lower())
+    return users
 
 
 def _to_int(value):
@@ -214,7 +222,7 @@ def view(ticket_id):
         attachments=attachments,
         status_color=status_color,
         priority_color=priority_color,
-        users=_agent_users(),
+        users=_agent_users(ticket.assignee),
     )
 
 
@@ -225,7 +233,8 @@ def edit(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     form = TicketForm(obj=ticket)
     form.assigned_to.choices = [(0, "Unassigned")] + [
-        (u.id, u.full_name) for u in _agent_users()
+        (u.id, f"{u.full_name} (Inactive)" if not u.is_active else u.full_name)
+        for u in _agent_users(ticket.assignee)
     ]
 
     if form.validate_on_submit():

@@ -82,7 +82,8 @@
                 <h5 class="mb-0">Related Tickets</h5>
             </div>
             <div class="card-body">
-                {% if asset.tickets.count() > 0 %}
+                {% set ticket_list = tickets if tickets is defined else asset.tickets.all() %}
+                {% if ticket_list %}
                 <table class="table table-sm">
                     <thead>
                         <tr>
@@ -92,7 +93,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        {% for ticket in asset.tickets.all() %}
+                        {% for ticket in ticket_list %}
                         <tr>
                             <td><a href="{{ url_for('tickets.view', ticket_id=ticket.id) }}">{{ ticket.ticket_number }}</a></td>
                             <td>{{ ticket.title[:40] }}…</td>

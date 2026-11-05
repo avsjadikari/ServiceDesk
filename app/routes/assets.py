@@ -47,7 +47,8 @@ def view(asset_id):
     if not current_user.is_agent() and asset.assigned_to != current_user.id:
         abort(403)
 
-    return render_template("assets/view.html", asset=asset)
+    tickets = asset.tickets.order_by(Ticket.created_at.desc()).all()
+    return render_template("assets/view.html", asset=asset, tickets=tickets)
 
 
 @assets.route("/assets/new", methods=["GET", "POST"])
