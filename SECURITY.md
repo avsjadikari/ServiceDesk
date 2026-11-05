@@ -229,7 +229,7 @@ Note: attachment routes depend on `UPLOAD_FOLDER` being writable; the Docker ent
 
 ## Production Readiness Verification & Audit Sign-Off
 
-All previous high and medium audit findings are remediated and verified across the test suite (315 passing tests):
+All previous high and medium audit findings are remediated and verified across the test suite (317 passing tests):
 
 | Issue | Remediated Location | Resolution Verified |
 |-------|---------------------|---------------------|

@@ -754,6 +754,7 @@ def disable_2fa():
         return redirect(url_for("auth.profile"))
 
     current_user.two_factor_enabled = False
+    current_user.two_factor_secret = None
     RecoveryCode.query.filter_by(user_id=current_user.id, used=False).update({"used": True})
     db.session.commit()
 

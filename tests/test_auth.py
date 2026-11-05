@@ -1526,6 +1526,7 @@ class TestTwoFactorSetupAndDisable:
 
         target = User.query.get(regular_user.id)
         assert target.two_factor_enabled is False
+        assert target.two_factor_secret is None
         rows = RecoveryCode.query.filter_by(user_id=target.id).all()
         assert rows and all(r.used for r in rows)
         assert (

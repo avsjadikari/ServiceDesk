@@ -247,7 +247,7 @@ ServiceDesk/
 │   │   ├── api.py           # REST API endpoints
 │   │   └── setup.py         # First-time setup wizard
 │   └── templates/           # Jinja2 UI templates (grouped by feature)
-├── tests/                   # Pytest suite (315 tests covering all features)
+├── tests/                   # Pytest suite (317 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Entry point (`python run.py`)
 ├── requirements.txt         # Python dependencies
@@ -291,7 +291,7 @@ ServiceDesk/
 | Database Migrations & Indexing | **Implemented** | Flask-Migrate (Alembic) schema versioning. Indexed timestamp columns (`resolved_at`, `closed_at`, `sla_deadline`) for performant analytical queries. |
 | Environment Config | **Implemented** | `.env.example` shipped in repository; requires explicit `SECRET_KEY` and supports canonical `SERVER_NAME`. |
 | Input Sanitization | **Implemented** | `app/sanitize.py` renders markdown safely with Bleach (`\| markdown_safe`). |
-| Automated Test Suite | **Implemented** | 315 unit, integration, characterization, and workflow tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
+| Automated Test Suite | **Implemented** | 317 unit, integration, characterization, and workflow tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
 | Ticket Attachment Security | **Implemented** | `tickets/view.html` renders attachments with UUID storage, MIME prefix checks, magic byte sniffing, and path traversal blocking. |
 | 2FA Login CSRF | **Implemented** | `/login-2fa` renders its CSRF token so the TOTP/recovery POST passes CSRFProtect. |
 | Asset Link Robustness | **Implemented** | Foreign key verification on asset linking; clean unlinking support (`asset_id=0`) with audit trail logging; active user filtering. |

@@ -2256,3 +2256,74 @@ class TestReassuranceCopy:
             assert resp.status_code == 200
             assert Ticket.query.get(ticket.id) is None
             assert not os.path.isfile(file_path)
+
+    def test_api_get_ticket_and_asset_details(
+        self, client, app, db, admin_user, agent_user
+    ):
+        from app.models import Asset, Ticket
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            asset = Asset(
+                name="Server Alpha",
+                asset_type="Server",
+                status="active",
+                assigned_to=agent_user.id,
+            )
+            db.session.add(asset)
+            db.session.commit()
+
+            ticket = Ticket(
+                ticket_number="TKT-999010",
+                title="Server outage",
+                description="desc",
+                type="incident",
+                priority="high",
+                created_by=admin_user.id,
+                assigned_to=agent_user.id,
+                asset_id=asset.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            resp = client.get(f"/api/tickets/{ticket.id}")
+            assert resp.status_code == 200
+            data = resp.get_json()
+            assert data["ticket_number"] == "TKT-999010"
+            assert data["assigned_to"] == agent_user.full_name
+            assert data["created_by"] == admin_user.full_name
+
+            resp_asset = client.get(f"/api/assets/{asset.id}")
+            assert resp_asset.status_code == 200
+            asset_data = resp_asset.get_json()
+            assert asset_data["name"] == "Server Alpha"
+            assert asset_data["assigned_to"] == agent_user.full_name
+
+    def test_api_get_users_filtering(
+        self, client, app, db, admin_user, agent_user, regular_user
+    ):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            from app.models import User
+            u = User.query.get(regular_user.id)
+            u.is_active = False
+            db.session.commit()
+
+            resp_all = client.get("/api/users")
+            assert resp_all.status_code == 200
+            all_users = resp_all.get_json()
+            assert any(u["username"] == "user" and u["is_active"] is False for u in all_users)
+
+            resp_active = client.get("/api/users?is_active=true")
+            assert resp_active.status_code == 200
+            active_users = resp_active.get_json()
+            assert all(u["is_active"] is True for u in active_users)
+            assert not any(u["username"] == "user" for u in active_users)
+
+            resp_inactive = client.get("/api/users?is_active=0")
+            assert resp_inactive.status_code == 200
+            inactive_users = resp_inactive.get_json()
+            assert all(u["is_active"] is False for u in inactive_users)
+            assert any(u["username"] == "user" for u in inactive_users)

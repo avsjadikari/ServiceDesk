@@ -113,7 +113,13 @@ def create_ticket():
 @api.route("/tickets/<int:ticket_id>", methods=["GET"])
 @login_required
 def get_ticket(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
+    ticket = (
+        Ticket.query.options(
+            joinedload(Ticket.assignee), joinedload(Ticket.creator)
+        )
+        .filter_by(id=ticket_id)
+        .first_or_404()
+    )
 
     if not can_view_ticket(current_user, ticket):
         return jsonify({"error": "Unauthorized"}), 403
@@ -339,7 +345,11 @@ def get_assets():
 @api.route("/assets/<int:asset_id>", methods=["GET"])
 @login_required
 def get_asset(asset_id):
-    asset = Asset.query.get_or_404(asset_id)
+    asset = (
+        Asset.query.options(joinedload(Asset.owner))
+        .filter_by(id=asset_id)
+        .first_or_404()
+    )
 
     if not can_view_asset(current_user, asset):
         return jsonify({"error": "Unauthorized"}), 403
@@ -381,8 +391,15 @@ def dashboard():
 def get_users():
     limit = min(request.args.get("limit", 100, type=int), 500)
     offset = max(request.args.get("offset", 0, type=int), 0)
+    query = User.query
+    is_active_arg = request.args.get("is_active")
+    if is_active_arg is not None:
+        if is_active_arg.lower() in ("true", "1"):
+            query = query.filter_by(is_active=True)
+        elif is_active_arg.lower() in ("false", "0"):
+            query = query.filter_by(is_active=False)
     users = (
-        User.query.order_by(User.id.asc())
+        query.order_by(User.id.asc())
         .limit(limit)
         .offset(offset)
         .all()
@@ -395,6 +412,7 @@ def get_users():
                 "full_name": u.full_name,
                 "role": u.role,
                 "department": u.department,
+                "is_active": u.is_active,
             }
             for u in users
         ]
