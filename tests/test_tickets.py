@@ -2327,3 +2327,7 @@ class TestReassuranceCopy:
             inactive_users = resp_inactive.get_json()
             assert all(u["is_active"] is False for u in inactive_users)
             assert any(u["username"] == "user" for u in inactive_users)
+
+            resp_invalid = client.get("/api/users?is_active=invalid")
+            assert resp_invalid.status_code == 400
+            assert "Invalid is_active value" in resp_invalid.get_json()["error"]

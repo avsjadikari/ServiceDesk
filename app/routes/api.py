@@ -244,7 +244,9 @@ def delete_ticket(ticket_id):
                     try:
                         os.remove(fpath)
                     except OSError:
-                        pass
+                        current_app.logger.warning(
+                            "Failed to remove attachment file on disk: %s", fpath
+                        )
     db.session.delete(ticket)
     db.session.commit()
 
@@ -398,6 +400,10 @@ def get_users():
             query = query.filter_by(is_active=True)
         elif is_active_arg.lower() in ("false", "0"):
             query = query.filter_by(is_active=False)
+        else:
+            return jsonify(
+                {"error": "Invalid is_active value. Must be true, false, 1, or 0"}
+            ), 400
     users = (
         query.order_by(User.id.asc())
         .limit(limit)
