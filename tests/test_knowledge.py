@@ -484,3 +484,92 @@ class TestDraftArticleRecoverable:
         )
         assert resp.status_code == 200
         assert client.get(f"/knowledge/{aid}").status_code == 200
+
+    def test_helpful_vote_deduplicates_in_session(
+        self, client, app, db, admin_user, regular_user
+    ):
+        """A user cannot repeatedly vote helpful in the same session."""
+        with app.app_context():
+            a = Article(
+                title="H3",
+                content="c",
+                category="Hardware",
+                author_id=admin_user.id,
+                status="published",
+                helpful_count=0,
+            )
+            db.session.add(a)
+            db.session.commit()
+            aid = a.id
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+
+        # First vote increments
+        client.post(f"/knowledge/{aid}/helpful", follow_redirects=True)
+        with app.app_context():
+            assert Article.query.get(aid).helpful_count == 1
+
+        # Second vote in same session does not increment
+        client.post(f"/knowledge/{aid}/helpful", follow_redirects=True)
+        with app.app_context():
+            assert Article.query.get(aid).helpful_count == 1
+
+    def test_article_operations_record_audit_logs(
+        self, client, app, db, admin_user
+    ):
+        """Article create, update, and delete actions write AuditLog rows."""
+        from app.models import AuditLog
+
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            # Create
+            res = client.post(
+                "/knowledge/new",
+                data={
+                    "title": "Audit Article",
+                    "content": "Sample content",
+                    "category": "Hardware",
+                    "status": "published",
+                    "tags": "test",
+                },
+                follow_redirects=True,
+            )
+            assert res.status_code == 200
+            article = Article.query.filter_by(title="Audit Article").first()
+            assert article is not None
+
+            create_log = AuditLog.query.filter_by(
+                action="create_article", entity_id=article.id
+            ).first()
+            assert create_log is not None
+
+            # Update
+            res = client.post(
+                f"/knowledge/{article.id}/edit",
+                data={
+                    "title": "Audit Article Updated",
+                    "content": "Sample content v2",
+                    "category": "Hardware",
+                    "status": "published",
+                    "tags": "test",
+                },
+                follow_redirects=True,
+            )
+            assert res.status_code == 200
+            update_log = AuditLog.query.filter_by(
+                action="update_article", entity_id=article.id
+            ).first()
+            assert update_log is not None
+
+            # Delete
+            res = client.post(
+                f"/knowledge/{article.id}/delete",
+                follow_redirects=True,
+            )
+            assert res.status_code == 200
+            delete_log = AuditLog.query.filter_by(
+                action="delete_article", entity_id=article.id
+            ).first()
+            assert delete_log is not None

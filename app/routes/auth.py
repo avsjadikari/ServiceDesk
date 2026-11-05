@@ -84,6 +84,8 @@ def login():
             if user.two_factor_enabled:
                 session["pre_2fa_user_id"] = user.id
                 session["remember_me"] = form.remember_me.data
+                if request.args.get("next"):
+                    session["next"] = request.args.get("next")
                 return redirect(url_for("auth.login_2fa"))
             return complete_login(user, form.remember_me.data)
 
@@ -112,9 +114,10 @@ def login():
     return render_template("auth/login.html", form=form)
 
 
-def complete_login(user, remember_me=False):
+def complete_login(user, remember_me=False, next_url=None):
     """Finalise a successful login: clear the session to prevent fixation,
     log the user in, audit, and route to the right landing page."""
+    next_page = next_url or request.args.get("next") or session.get("next")
     session.clear()
     login_user(user, remember=remember_me)
     log_audit(user.id, "login", "user", user.id)
@@ -123,11 +126,16 @@ def complete_login(user, remember_me=False):
         flash("You must change your password on first login.", "warning")
         return redirect(url_for("auth.change_password"))
 
-    next_page = request.args.get("next")
     if next_page:
-        parts = urlsplit(next_page)
-        if parts.scheme or parts.netloc:
+        clean = next_page.strip()
+        if not clean.startswith("/") or clean.startswith("//") or "\\" in clean:
             next_page = None
+        else:
+            parts = urlsplit(clean)
+            if parts.scheme or parts.netloc:
+                next_page = None
+            else:
+                next_page = clean
     if not next_page:
         next_page = (
             url_for("main.dashboard")
@@ -172,18 +180,22 @@ def login_2fa():
                 matched_code.used = True
                 db.session.commit()
                 remember_me = session.get("remember_me", False)
+                next_url = session.get("next")
                 session.pop("pre_2fa_user_id", None)
                 session.pop("remember_me", None)
+                session.pop("next", None)
                 log_audit(user.id, "recovery_code_used", "user", user.id)
-                return complete_login(user, remember_me)
+                return complete_login(user, remember_me, next_url=next_url)
             flash("Invalid recovery code. Please try again.", "danger")
         else:
             code = request.form.get("code", "").strip()
             if user.verify_totp(code):
                 remember_me = session.get("remember_me", False)
+                next_url = session.get("next")
                 session.pop("pre_2fa_user_id", None)
                 session.pop("remember_me", None)
-                return complete_login(user, remember_me)
+                session.pop("next", None)
+                return complete_login(user, remember_me, next_url=next_url)
             flash("Invalid verification code. Please try again.", "danger")
 
     return render_template("auth/login_2fa.html", user=user)
@@ -361,11 +373,25 @@ def create_user():
 @login_required
 def profile():
     if request.method == "POST":
-        current_user.full_name = request.form.get("full_name")
-        current_user.email = request.form.get("email")
-        current_user.department = request.form.get("department")
-        current_user.phone = request.form.get("phone")
+        email = (request.form.get("email") or "").strip().lower()
+        if not email:
+            flash("Email cannot be empty.", "danger")
+            return redirect(url_for("auth.profile"))
+
+        existing = User.query.filter(
+            db.func.lower(User.email) == email,
+            User.id != current_user.id,
+        ).first()
+        if existing:
+            flash("That email address is already registered.", "danger")
+            return redirect(url_for("auth.profile"))
+
+        current_user.full_name = (request.form.get("full_name") or "").strip() or current_user.full_name
+        current_user.email = email
+        current_user.department = (request.form.get("department") or "").strip() or None
+        current_user.phone = (request.form.get("phone") or "").strip() or None
         db.session.commit()
+        log_audit(current_user.id, "update_profile", "user", current_user.id)
         flash("Profile updated successfully.", "success")
         return redirect(url_for("auth.profile"))
 

@@ -1,10 +1,10 @@
-from flask import Blueprint, render_template, redirect, url_for, flash, request, abort
+from flask import Blueprint, render_template, redirect, url_for, flash, request, abort, session
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from app import db
 from app.models import Article, ArticleVersion
 from app.forms import ArticleForm, ArticleSearchForm
-from app.utils import parse_tags
+from app.utils import log_audit, parse_tags
 
 knowledge = Blueprint("knowledge", __name__)
 
@@ -97,6 +97,13 @@ def new():
         )
         db.session.add(version)
         db.session.commit()
+        log_audit(
+            current_user.id,
+            "create_article",
+            "article",
+            article.id,
+            details={"title": article.title},
+        )
 
         flash(f'Article "{article.title}" created successfully.', "success")
         return redirect(url_for("knowledge.view", article_id=article.id))
@@ -128,8 +135,14 @@ def edit(article_id):
             created_by=current_user.id,
         )
         db.session.add(version)
-
         db.session.commit()
+        log_audit(
+            current_user.id,
+            "update_article",
+            "article",
+            article.id,
+            details={"title": article.title, "version": article.version},
+        )
 
         flash(f'Article "{article.title}" updated successfully.', "success")
         return redirect(url_for("knowledge.view", article_id=article.id))
@@ -159,9 +172,15 @@ def versions(article_id):
 @login_required
 def helpful(article_id):
     article = Article.query.get_or_404(article_id)
+    voted = session.setdefault("helpful_voted", [])
     if request.form.get("vote") != "dismiss":
-        article.helpful_count += 1
-    db.session.commit()
+        if article_id not in voted:
+            article.helpful_count += 1
+            voted.append(article_id)
+            session.modified = True
+            db.session.commit()
+    else:
+        db.session.commit()
     flash("Thank you for your feedback!", "success")
     return redirect(url_for("knowledge.view", article_id=article_id))
 
@@ -173,6 +192,13 @@ def delete(article_id):
         abort(403)
 
     article = Article.query.get_or_404(article_id)
+    log_audit(
+        current_user.id,
+        "delete_article",
+        "article",
+        article.id,
+        details={"title": article.title},
+    )
     db.session.delete(article)
     db.session.commit()
 

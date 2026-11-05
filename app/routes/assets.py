@@ -2,8 +2,9 @@ from flask import Blueprint, render_template, redirect, url_for, flash, request,
 from flask_login import login_required, current_user
 from sqlalchemy.orm import joinedload
 from app import db
-from app.models import Asset, User
+from app.models import Asset, Ticket, User
 from app.forms import AssetForm
+from app.utils import log_audit
 
 assets = Blueprint("assets", __name__)
 
@@ -75,6 +76,13 @@ def new():
 
         db.session.add(asset)
         db.session.commit()
+        log_audit(
+            current_user.id,
+            "create_asset",
+            "asset",
+            asset.id,
+            details={"name": asset.name},
+        )
 
         flash(f'Asset "{asset.name}" created successfully.', "success")
         return redirect(url_for("assets.view", asset_id=asset.id))
@@ -112,6 +120,13 @@ def edit(asset_id):
             asset.assigned_to = None
 
         db.session.commit()
+        log_audit(
+            current_user.id,
+            "update_asset",
+            "asset",
+            asset.id,
+            details={"name": asset.name},
+        )
 
         flash(f'Asset "{asset.name}" updated successfully.', "success")
         return redirect(url_for("assets.view", asset_id=asset.id))
@@ -126,6 +141,16 @@ def delete(asset_id):
         abort(403)
 
     asset = Asset.query.get_or_404(asset_id)
+    log_audit(
+        current_user.id,
+        "delete_asset",
+        "asset",
+        asset.id,
+        details={"name": asset.name},
+    )
+    Ticket.query.filter_by(asset_id=asset.id).update(
+        {"asset_id": None}, synchronize_session=False
+    )
     db.session.delete(asset)
     db.session.commit()
 
@@ -140,23 +165,42 @@ def assign(asset_id):
         abort(403)
 
     asset = Asset.query.get_or_404(asset_id)
-    user_id = request.form.get("user_id")
+    raw_user_id = request.form.get("user_id")
 
-    if user_id:
-        try:
-            user_id = int(user_id)
-        except (TypeError, ValueError):
-            flash("Invalid user.", "danger")
-            return redirect(url_for("assets.view", asset_id=asset_id))
-
-        user = User.query.get(user_id)
-        if user is None or not user.is_active:
-            flash("User does not exist.", "danger")
-            return redirect(url_for("assets.view", asset_id=asset_id))
-
-        asset.assigned_to = user_id
+    if not raw_user_id or raw_user_id.strip() in ("", "0"):
+        old_assigned = asset.assigned_to
+        asset.assigned_to = None
         db.session.commit()
+        log_audit(
+            current_user.id,
+            "unassign_asset",
+            "asset",
+            asset.id,
+            details={"previous_assigned_to": old_assigned},
+        )
+        flash("Asset unassigned successfully.", "success")
+        return redirect(url_for("assets.view", asset_id=asset_id))
 
-        flash("Asset assigned successfully.", "success")
+    try:
+        user_id = int(raw_user_id)
+    except (TypeError, ValueError):
+        flash("Invalid user.", "danger")
+        return redirect(url_for("assets.view", asset_id=asset_id))
 
+    user = User.query.get(user_id)
+    if user is None or not user.is_active:
+        flash("User does not exist.", "danger")
+        return redirect(url_for("assets.view", asset_id=asset_id))
+
+    asset.assigned_to = user_id
+    db.session.commit()
+    log_audit(
+        current_user.id,
+        "assign_asset",
+        "asset",
+        asset.id,
+        details={"assigned_to": user_id},
+    )
+
+    flash("Asset assigned successfully.", "success")
     return redirect(url_for("assets.view", asset_id=asset_id))

@@ -18,18 +18,12 @@ Authentication: Session-based (Flask-Login). Most endpoints require login and ro
 - DELETE `/api/tickets/<id>` (login_required, agent/admin) — delete ticket
 
 ### Articles
-- GET `/api/articles` (login_required) — list articles
-- GET `/api/articles/<id>` (login_required) — get article
-- POST `/api/articles` (login_required, agent/admin) — create article
-- PUT `/api/articles/<id>` (login_required, agent/admin) — update article
-- DELETE `/api/articles/<id>` (login_required, agent/admin) — delete article
+- GET `/api/articles` (login_required) — list published articles (supports `?search=`, `?limit=`, `?offset=`)
+- GET `/api/articles/<id>` (login_required) — get article details
 
 ### Assets
-- GET `/api/assets` (login_required, agent/admin) — list assets
+- GET `/api/assets` (login_required, agent/admin) — list assets (supports `?limit=`, `?offset=`)
 - GET `/api/assets/<id>` (login_required) — get asset (owner or agent/admin)
-- POST `/api/assets` (login_required, agent/admin) — create asset
-- PUT `/api/assets/<id>` (login_required, agent/admin) — update asset
-- DELETE `/api/assets/<id>` (login_required, agent/admin) — delete asset
 
 ### Analytics
 - GET `/api/analytics/dashboard` (login_required, agent/admin) — metrics + SLA compliance

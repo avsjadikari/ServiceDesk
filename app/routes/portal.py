@@ -1,10 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
-from app import db
+from app import db, limiter
 from app.models import Ticket, Article, Comment
 from app.forms import TicketForm, CommentForm
 from app.policy import can_view_portal_ticket
-from app.tickets_lifecycle import create_ticket
+from app.tickets_lifecycle import add_comment, create_ticket
 
 portal = Blueprint("portal", __name__)
 
@@ -52,6 +52,7 @@ def knowledge():
 
 
 @portal.route("/portal/knowledge/<int:article_id>")
+@limiter.limit("60 per minute")
 def knowledge_view(article_id):
     article = (
         Article.query.filter(
@@ -120,13 +121,12 @@ def view_ticket(ticket_id):
     comment_form = CommentForm()
 
     if comment_form.validate_on_submit():
-        comment = Comment(
-            ticket_id=ticket.id,
-            user_id=current_user.id,
-            content=comment_form.content.data,
+        add_comment(
+            ticket,
+            comment_form.content.data,
             is_internal=False,
+            user_id=current_user.id,
         )
-        db.session.add(comment)
         db.session.commit()
 
         flash("Your comment has been added.", "success")

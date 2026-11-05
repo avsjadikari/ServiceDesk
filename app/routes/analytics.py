@@ -1,4 +1,4 @@
-from flask import Blueprint, render_template, jsonify, request
+from flask import Blueprint, render_template, jsonify, request, abort
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from sqlalchemy import func
@@ -79,8 +79,14 @@ def sla():
 
     sla_data = calculate_sla_compliance()
 
-    resolved_tickets = Ticket.query.filter(Ticket.resolved_at.isnot(None)).all()
-    valid_res_times = [t.resolution_time for t in resolved_tickets if t.resolution_time is not None]
+    resolved_pairs = (
+        db.session.query(Ticket.created_at, Ticket.resolved_at)
+        .filter(Ticket.resolved_at.isnot(None), Ticket.created_at.isnot(None))
+        .all()
+    )
+    valid_res_times = [
+        (r - c).total_seconds() / 3600 for c, r in resolved_pairs if r and c
+    ]
     avg_mttr = round(sum(valid_res_times) / len(valid_res_times), 1) if valid_res_times else 0.0
     sla_data["mttr_hours"] = avg_mttr
 
@@ -139,9 +145,3 @@ def audit_logs():
 
     logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(100).all()
     return render_template("analytics/audit_logs.html", logs=logs)
-
-
-def abort(status_code):
-    from flask import abort as flask_abort
-
-    flask_abort(status_code)

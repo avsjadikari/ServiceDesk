@@ -22,8 +22,10 @@ def ready():
     try:
         db.session.execute(text("SELECT 1"))
         return jsonify({"status": "ready"}), 200
-    except Exception as exc:
-        return jsonify({"status": "not-ready", "error": str(exc)}), 503
+    except Exception:
+        from flask import current_app
+        current_app.logger.exception("Database readiness check failed")
+        return jsonify({"status": "not-ready"}), 503
 
 
 @main.route("/")

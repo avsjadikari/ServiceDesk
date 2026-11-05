@@ -181,7 +181,7 @@ class Ticket(db.Model):
     created_by = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False, index=True)
     assigned_to = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
 
-    asset_id = db.Column(db.Integer, db.ForeignKey("assets.id"))
+    asset_id = db.Column(db.Integer, db.ForeignKey("assets.id", ondelete="SET NULL"))
 
     sla_deadline = db.Column(db.DateTime)
     first_response_at = db.Column(db.DateTime)
@@ -373,7 +373,7 @@ class AuditLog(db.Model):
     action = db.Column(db.String(50), nullable=False)
     entity_type = db.Column(db.String(50))
     entity_id = db.Column(db.Integer)
-    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id"))
+    ticket_id = db.Column(db.Integer, db.ForeignKey("tickets.id", ondelete="SET NULL"))
     details = db.Column(db.JSON)
     ip_address = db.Column(db.String(45))
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)

@@ -6,13 +6,14 @@ from app.enums import (
     TICKET_STATUSES,
     TICKET_TYPES,
 )
-from app.models import Ticket, Article, Asset, User
+from app.models import Ticket, Article, Asset, User, AuditLog
 from app import tickets_lifecycle
 from app.policy import can_view_asset, can_view_ticket
 from app.utils import (
     get_ticket_metrics,
     calculate_sla_compliance,
     log_audit,
+    log_ticket_audit,
 )
 
 VALID_TICKET_TYPES = set(TICKET_TYPES)
@@ -38,7 +39,14 @@ def require_agent(f):
 @login_required
 @require_agent
 def get_tickets():
-    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    offset = max(request.args.get("offset", 0, type=int), 0)
+    tickets = (
+        Ticket.query.order_by(Ticket.created_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
     return jsonify(
         [
             {
@@ -138,32 +146,54 @@ def update_ticket(ticket_id):
     if not data:
         return jsonify({"error": "Request body must be JSON"}), 400
 
+    details = {}
     if "title" in data:
         title = (data["title"] or "").strip()
         if not title:
             return jsonify({"error": "Title cannot be empty"}), 400
         if len(title) > 200:
             return jsonify({"error": "Title must be 200 characters or fewer"}), 400
-        ticket.title = title
+        if title != ticket.title:
+            details["title"] = title
+            ticket.title = title
     if "description" in data:
-        ticket.description = (data["description"] or "").strip()
-    if "status" in data:
-        status = data["status"]
-        if status not in VALID_TICKET_STATUSES:
-            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(VALID_TICKET_STATUSES))}"}), 400
-        ticket.status = status
-        ticket.apply_status_timestamps(status)
+        desc = (data["description"] or "").strip()
+        if desc != (ticket.description or ""):
+            details["description"] = desc
+            ticket.description = desc
     if "priority" in data:
         priority = data["priority"]
         if priority not in VALID_TICKET_PRIORITIES:
             return jsonify({"error": f"Invalid priority. Must be one of: {', '.join(sorted(VALID_TICKET_PRIORITIES))}"}), 400
-        ticket.priority = priority
+        if priority != ticket.priority:
+            details["priority"] = priority
+            ticket.priority = priority
     if "category" in data:
-        ticket.category = (data["category"] or "").strip() or None
+        cat = (data["category"] or "").strip() or None
+        if cat != ticket.category:
+            details["category"] = cat
+            ticket.category = cat
+
+    if details:
+        log_ticket_audit(ticket, "update", details=details, commit=False)
+
+    if "status" in data:
+        status = data["status"]
+        if status not in VALID_TICKET_STATUSES:
+            return jsonify({"error": f"Invalid status. Must be one of: {', '.join(sorted(VALID_TICKET_STATUSES))}"}), 400
+        if status != ticket.status:
+            tickets_lifecycle.change_status(ticket, status)
+
     if "assigned_to" in data:
         assignee_id = data["assigned_to"]
         if assignee_id is None:
-            ticket.assigned_to = None
+            if ticket.assigned_to is not None:
+                ticket.assigned_to = None
+                if ticket.status in (None, "new", "assigned"):
+                    ticket.status = "new"
+                log_ticket_audit(
+                    ticket, "unassign", {"assigned_to": None}, commit=False
+                )
         else:
             try:
                 assignee_id = int(assignee_id)
@@ -176,7 +206,8 @@ def update_ticket(ticket_id):
                 return jsonify(
                     {"error": "Assignee must be an agent or admin"}
                 ), 400
-            ticket.assigned_to = assignee_id
+            if ticket.assigned_to != assignee_id:
+                tickets_lifecycle.assign_ticket(ticket, assignee_id)
 
     db.session.commit()
 
@@ -197,6 +228,9 @@ def delete_ticket(ticket_id):
         ticket.id,
         details={"ticket_number": ticket_number},
     )
+    AuditLog.query.filter_by(ticket_id=ticket.id).update(
+        {"ticket_id": None}, synchronize_session=False
+    )
     db.session.delete(ticket)
     db.session.commit()
 
@@ -216,7 +250,14 @@ def get_articles():
             )
         )
 
-    articles = query.order_by(Article.updated_at.desc()).all()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    offset = max(request.args.get("offset", 0, type=int), 0)
+    articles = (
+        query.order_by(Article.updated_at.desc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
 
     return jsonify(
         [
@@ -261,7 +302,14 @@ def get_article(article_id):
 @login_required
 @require_agent
 def get_assets():
-    assets = Asset.query.order_by(Asset.name.asc()).all()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    offset = max(request.args.get("offset", 0, type=int), 0)
+    assets = (
+        Asset.query.order_by(Asset.name.asc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
 
     return jsonify(
         [
@@ -322,7 +370,14 @@ def dashboard():
 @login_required
 @require_agent
 def get_users():
-    users = User.query.all()
+    limit = min(request.args.get("limit", 100, type=int), 500)
+    offset = max(request.args.get("offset", 0, type=int), 0)
+    users = (
+        User.query.order_by(User.id.asc())
+        .limit(limit)
+        .offset(offset)
+        .all()
+    )
     return jsonify(
         [
             {

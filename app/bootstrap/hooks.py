@@ -85,6 +85,8 @@ def register_hooks(app) -> None:
             session.clear()
             return redirect(url_for("setup.wizard"))
 
+        session["setup_complete"] = True
+
     @app.before_request
     def enforce_request_size_limit():
         limit = app.config.get("MAX_CONTENT_LENGTH")

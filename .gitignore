@@ -56,3 +56,5 @@ htmlcov/
 .qwen/
 .codegraph/
 .poolside/
+.projectmem/
+.github/context-mode/

@@ -133,6 +133,20 @@ class TestAuthentication:
             assert "evil.com" not in location
             assert location.endswith("/dashboard")
 
+    def test_login_next_rejects_backslash_redirect_url(self, client, app, admin_user):
+        """Regression: backslash and mixed-slash next URLs must not redirect off-site."""
+        with app.app_context():
+            for target in (r"\evil.com", r"\\evil.com", r"/\evil.com", r"//evil.com/path"):
+                response = client.post(
+                    f"/login?next={target}",
+                    data={"username": "admin", "password": "Admin@123456"},
+                    follow_redirects=False,
+                )
+                assert response.status_code == 302
+                location = response.headers.get("Location", "")
+                assert "evil.com" not in location
+                assert location.endswith("/dashboard")
+
     def test_login_next_allows_relative_path(self, client, app, admin_user):
         """A same-site relative ``next`` still works."""
         with app.app_context():
@@ -776,6 +790,23 @@ class TestLoginTwoFactorBranches:
             assert sess.get("_user_id") == str(regular_user.id)
         assert client.get("/profile").status_code == 200
 
+    def test_valid_totp_redirects_to_saved_next_target(
+        self, client, app, db, regular_user
+    ):
+        secret = pyotp.random_base32()
+        regular_user.two_factor_enabled = True
+        regular_user.two_factor_secret = secret
+        db.session.commit()
+        with client.session_transaction() as sess:
+            sess["pre_2fa_user_id"] = regular_user.id
+            sess["remember_me"] = False
+            sess["next"] = "/portal/tickets"
+
+        code = pyotp.TOTP(secret).now()
+        response = client.post("/login-2fa", data={"code": code})
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/portal/tickets")
+
 
 class TestForgotPassword:
     """Characterization: /forgot-password enumeration-safe responses."""
@@ -927,6 +958,10 @@ class TestResetPassword:
             ).count()
             == 1
         )
+
+        # Single-use: using the same token again is rejected
+        reuse_response = client.get(f"/reset-password/{token}", follow_redirects=True)
+        assert b"This password reset link is invalid or has expired." in reuse_response.data
 
     def test_reset_password_accepts_the_same_password(
         self, client, app, db, regular_user
@@ -1092,6 +1127,23 @@ class TestRegisterAndProfile:
         assert target.email == "renamed@test.com"
         assert target.department == "QA"
         assert target.phone == "555-0100"
+
+    def test_profile_post_duplicate_email_rejected(
+        self, client, app, db, regular_user, admin_user
+    ):
+        _login(client, "user", "User@123456")
+        response = client.post(
+            "/profile",
+            data={
+                "full_name": "Test User",
+                "email": admin_user.email,
+            },
+            follow_redirects=True,
+        )
+        assert response.status_code == 200
+        assert b"That email address is already registered." in response.data
+        target = User.query.get(regular_user.id)
+        assert target.email != admin_user.email
 
 
 class TestAdminUserManagementBranches:

@@ -28,6 +28,12 @@ def _is_dev_mode():
     return os.environ.get("FLASK_CONFIG", "development") != "production"
 
 
+def _clean_env_val(val):
+    if val is None:
+        return ""
+    return str(val).replace("\r", "").replace("\n", "").strip()
+
+
 def save_config(db_type, db_host, db_port, db_name, db_user, db_password, company_name):
     existing_config = {}
 
@@ -40,13 +46,13 @@ def save_config(db_type, db_host, db_port, db_name, db_user, db_password, compan
                     existing_config[key] = value
 
     config_lines = []
-    config_lines.append(f"DB_TYPE={db_type}")
-    config_lines.append(f"DB_HOST={db_host}")
-    config_lines.append(f"DB_PORT={db_port}")
-    config_lines.append(f"DB_NAME={db_name}")
-    config_lines.append(f"DB_USER={db_user}")
-    config_lines.append(f"DB_PASSWORD={db_password}")
-    config_lines.append(f"COMPANY_NAME={company_name}")
+    config_lines.append(f"DB_TYPE={_clean_env_val(db_type)}")
+    config_lines.append(f"DB_HOST={_clean_env_val(db_host)}")
+    config_lines.append(f"DB_PORT={_clean_env_val(db_port)}")
+    config_lines.append(f"DB_NAME={_clean_env_val(db_name)}")
+    config_lines.append(f"DB_USER={_clean_env_val(db_user)}")
+    config_lines.append(f"DB_PASSWORD={_clean_env_val(db_password)}")
+    config_lines.append(f"COMPANY_NAME={_clean_env_val(company_name)}")
 
     if existing_config.get("SECRET_KEY"):
         config_lines.append(f"SECRET_KEY={existing_config['SECRET_KEY']}")
@@ -162,8 +168,14 @@ def wizard():
 
 @setup.route("/setup/complete")
 def complete():
-    session["setup_complete"] = True
-    return redirect(url_for("main.index"))
+    try:
+        admin_exists = User.query.filter_by(role="admin").first()
+    except Exception:
+        admin_exists = None
+    if admin_exists:
+        session["setup_complete"] = True
+        return redirect(url_for("main.index"))
+    return redirect(url_for("setup.wizard"))
 
 
 @setup.route("/admin/db/init", methods=["GET", "POST"])
@@ -216,10 +228,10 @@ def db_init():
             session.clear()
 
             return redirect(url_for("setup.wizard"))
-        except Exception as e:
+        except Exception:
             db.session.rollback()
             current_app.logger.exception("Database re-init failed")
-            flash(f"Error initializing database: {str(e)}", "danger")
+            flash("Error initializing database. Check application logs.", "danger")
 
     return render_template("setup/db_init.html")
 
@@ -251,8 +263,8 @@ def db_backup():
                 "warning",
             )
 
-    except Exception as e:
+    except Exception:
         current_app.logger.exception("Database backup failed")
-        flash(f"Error creating backup: {str(e)}", "danger")
+        flash("Error creating database backup. Check application logs.", "danger")
 
     return redirect(url_for("main.dashboard"))

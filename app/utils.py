@@ -16,13 +16,29 @@ from app.models import Ticket, AuditLog, User
 
 
 def generate_ticket_number() -> str:
+    candidates = []
+    for obj in db.session.new:
+        if isinstance(obj, Ticket) and getattr(obj, "ticket_number", None):
+            candidates.append(obj.ticket_number)
+
     last_ticket = Ticket.query.order_by(Ticket.id.desc()).first()
-    if last_ticket:
-        last_num = int(last_ticket.ticket_number.split("-")[1])
-        new_num = last_num + 1
-    else:
-        new_num = 1000
-    return f"TKT-{new_num:06d}"
+    if last_ticket and last_ticket.ticket_number:
+        candidates.append(last_ticket.ticket_number)
+
+    max_num = 999
+    for tn in candidates:
+        parts = str(tn).split("-")
+        if len(parts) >= 2 and parts[1].isdigit():
+            max_num = max(max_num, int(parts[1]))
+
+    new_num = max_num + 1
+    ticket_num = f"TKT-{new_num:06d}"
+
+    while Ticket.query.filter_by(ticket_number=ticket_num).first() is not None:
+        new_num += 1
+        ticket_num = f"TKT-{new_num:06d}"
+
+    return ticket_num
 
 
 def build_ticket(
@@ -77,7 +93,12 @@ def calculate_sla_deadline(
 def _client_ip() -> str | None:
     if not has_request_context():
         return None
-    return request.headers.get("X-Forwarded-For", request.remote_addr)
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        ip = forwarded.split(",")[0].strip()
+    else:
+        ip = request.remote_addr
+    return ip[:45] if ip else None
 
 
 def log_audit(
@@ -161,20 +182,30 @@ def parse_tags(tag_string: str | None) -> list[str]:
 
 
 def get_ticket_metrics() -> dict:
-    total = Ticket.query.count()
-    open_tickets = Ticket.query.filter(Ticket.status.in_(TICKET_OPEN_STATUSES)).count()
-    resolved = Ticket.query.filter_by(status="resolved").count()
-    closed = Ticket.query.filter_by(status="closed").count()
+    status_counts = dict(
+        db.session.query(Ticket.status, db.func.count(Ticket.id))
+        .group_by(Ticket.status)
+        .all()
+    )
+    total = sum(status_counts.values())
+    open_tickets = sum(status_counts.get(s, 0) for s in TICKET_OPEN_STATUSES)
+    resolved = status_counts.get("resolved", 0)
+    closed = status_counts.get("closed", 0)
 
-    by_priority = {}
-    for priority in TICKET_PRIORITIES:
-        by_priority[priority] = Ticket.query.filter_by(priority=priority).count()
+    by_status = {s: status_counts.get(s, 0) for s in TICKET_STATUSES}
 
-    by_status = {}
-    for status in TICKET_STATUSES:
-        by_status[status] = Ticket.query.filter_by(status=status).count()
+    priority_counts = dict(
+        db.session.query(Ticket.priority, db.func.count(Ticket.id))
+        .group_by(Ticket.priority)
+        .all()
+    )
+    by_priority = {p: priority_counts.get(p, 0) for p in TICKET_PRIORITIES}
 
-    by_category = {}
+    category_counts = dict(
+        db.session.query(Ticket.category, db.func.count(Ticket.id))
+        .group_by(Ticket.category)
+        .all()
+    )
     categories = [
         "Hardware",
         "Software",
@@ -186,8 +217,7 @@ def get_ticket_metrics() -> dict:
         "Database",
         "Other",
     ]
-    for cat in categories:
-        by_category[cat] = Ticket.query.filter_by(category=cat).count()
+    by_category = {cat: category_counts.get(cat, 0) for cat in categories}
 
     return {
         "total": total,
@@ -202,30 +232,49 @@ def get_ticket_metrics() -> dict:
 
 def get_agent_performance() -> list[dict]:
     agents = User.query.filter(User.role.in_(["agent", "admin"])).all()
-    performance = []
+    if not agents:
+        return []
 
-    for agent in agents:
-        assigned = Ticket.query.filter_by(assigned_to=agent.id).count()
-        resolved = Ticket.query.filter_by(
-            assigned_to=agent.id, status="resolved"
-        ).count()
+    agent_ids = [a.id for a in agents]
 
-        avg_resolution = None
-        resolved_tickets = Ticket.query.filter_by(
-            assigned_to=agent.id, status="resolved"
+    assigned_counts = dict(
+        db.session.query(Ticket.assigned_to, db.func.count(Ticket.id))
+        .filter(Ticket.assigned_to.in_(agent_ids))
+        .group_by(Ticket.assigned_to)
+        .all()
+    )
+
+    resolved_counts = dict(
+        db.session.query(Ticket.assigned_to, db.func.count(Ticket.id))
+        .filter(Ticket.assigned_to.in_(agent_ids), Ticket.status == "resolved")
+        .group_by(Ticket.assigned_to)
+        .all()
+    )
+
+    resolved_tickets = (
+        Ticket.query.filter(
+            Ticket.assigned_to.in_(agent_ids),
+            Ticket.status == "resolved",
+            Ticket.resolved_at.isnot(None),
+            Ticket.created_at.isnot(None),
         ).all()
-        resolution_times = [
-            t.resolution_time for t in resolved_tickets if t.resolution_time
-        ]
-        if resolution_times:
-            avg_resolution = sum(resolution_times) / len(resolution_times)
+    )
 
+    res_by_agent: dict[int, list[float]] = {}
+    for t in resolved_tickets:
+        if t.resolution_time is not None:
+            res_by_agent.setdefault(t.assigned_to, []).append(t.resolution_time)
+
+    performance = []
+    for agent in agents:
+        resolution_times = res_by_agent.get(agent.id, [])
+        avg_res = (sum(resolution_times) / len(resolution_times)) if resolution_times else 0
         performance.append(
             {
                 "agent": agent,
-                "assigned": assigned,
-                "resolved": resolved,
-                "avg_resolution_hours": avg_resolution if avg_resolution else 0,
+                "assigned": assigned_counts.get(agent.id, 0),
+                "resolved": resolved_counts.get(agent.id, 0),
+                "avg_resolution_hours": avg_res,
             }
         )
 
@@ -233,22 +282,14 @@ def get_agent_performance() -> list[dict]:
 
 
 def calculate_sla_compliance() -> dict:
-    resolved_tickets = Ticket.query.filter(
-        Ticket.status.in_(TICKET_CLOSED_STATUSES), Ticket.resolved_at.isnot(None)
-    ).all()
+    base_q = Ticket.query.filter(
+        Ticket.status.in_(TICKET_CLOSED_STATUSES),
+        Ticket.resolved_at.isnot(None),
+        Ticket.sla_deadline.isnot(None),
+    )
 
-    if not resolved_tickets:
-        return {"compliance_rate": 100, "breached": 0, "met": 0}
-
-    met = 0
-    breached = 0
-
-    for ticket in resolved_tickets:
-        if ticket.sla_deadline and ticket.resolved_at <= ticket.sla_deadline:
-            met += 1
-        elif ticket.sla_deadline:
-            breached += 1
-
+    met = base_q.filter(Ticket.resolved_at <= Ticket.sla_deadline).count()
+    breached = base_q.filter(Ticket.resolved_at > Ticket.sla_deadline).count()
     total = met + breached
     compliance_rate = (met / total * 100) if total > 0 else 100
 

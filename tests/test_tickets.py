@@ -1788,3 +1788,175 @@ class TestReassuranceCopy:
             assert "TKT-320001" in body
             assert "a support person is actively working on it" in body.lower()
             assert "in_progress" not in send.call_args.args[1]
+
+
+    def test_portal_comment_uses_lifecycle_audit_and_notify(
+        self, client, app, db, regular_user, admin_user
+    ):
+        from unittest import mock
+        from app.models import AuditLog, Comment, Ticket
+
+        with app.app_context():
+            ticket = Ticket(
+                ticket_number="TKT-320002",
+                title="Portal comment test",
+                description="Testing lifecycle",
+                type="incident",
+                priority="medium",
+                created_by=regular_user.id,
+                assigned_to=admin_user.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+
+            with mock.patch("app.email_utils.send_email") as send:
+                resp = client.post(
+                    f"/portal/tickets/{ticket.id}",
+                    data={"content": "Here is an update from portal customer"},
+                    follow_redirects=True,
+                )
+            assert resp.status_code == 200
+            assert b"Your comment has been added." in resp.data
+
+            audit = AuditLog.query.filter_by(
+                ticket_id=ticket.id, action="comment"
+            ).first()
+            assert audit is not None
+            assert audit.user_id == regular_user.id
+
+            comment = Comment.query.filter_by(ticket_id=ticket.id).first()
+            assert comment is not None
+            assert comment.content == "Here is an update from portal customer"
+            assert comment.is_internal is False
+
+            assert send.called
+
+
+    def test_api_update_ticket_uses_lifecycle_audit_and_notify(
+        self, client, app, db, admin_user, regular_user
+    ):
+        from unittest import mock
+        from app.models import AuditLog, Ticket
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-320003",
+                title="API update test",
+                description="Initial",
+                type="incident",
+                priority="low",
+                created_by=regular_user.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            with mock.patch("app.email_utils.send_email") as send:
+                resp = client.put(
+                    f"/api/tickets/{ticket.id}",
+                    json={
+                        "title": "API updated title",
+                        "status": "in_progress",
+                        "assigned_to": admin_user.id,
+                    },
+                )
+            assert resp.status_code == 200
+
+            # Audit logs for update, status_change, and assign should all exist
+            status_audit = AuditLog.query.filter_by(
+                ticket_id=ticket.id, action="status_change"
+            ).first()
+            assert status_audit is not None
+            assert status_audit.details["new_status"] == "in_progress"
+
+            assign_audit = AuditLog.query.filter_by(
+                ticket_id=ticket.id, action="assign"
+            ).first()
+            assert assign_audit is not None
+            assert assign_audit.details["assigned_to"] == admin_user.id
+
+            update_audit = AuditLog.query.filter_by(
+                ticket_id=ticket.id, action="update"
+            ).first()
+            assert update_audit is not None
+
+            assert send.called
+
+
+    def test_generate_ticket_number_unflushed_and_collision_safe(
+        self, app, db, admin_user
+    ):
+        from app.utils import build_ticket, generate_ticket_number
+        from app.models import Ticket
+
+        with app.app_context():
+            # Build two tickets in same session before flush/commit
+            t1 = build_ticket("First", "desc", "incident", "low", "Hardware", admin_user.id)
+            db.session.add(t1)
+            t2 = build_ticket("Second", "desc", "incident", "low", "Hardware", admin_user.id)
+            db.session.add(t2)
+
+            assert t1.ticket_number != t2.ticket_number
+
+            db.session.commit()
+
+            # Pre-insert a future ticket number to test collision skipping
+            num1 = int(t2.ticket_number.split("-")[1])
+            colliding_num = f"TKT-{num1 + 1:06d}"
+            skip_ticket = Ticket(
+                ticket_number=colliding_num,
+                title="Pre-existing",
+                description="desc",
+                type="incident",
+                priority="low",
+                created_by=admin_user.id,
+            )
+            db.session.add(skip_ticket)
+            db.session.commit()
+
+            # Next generated number must skip colliding_num
+            next_num = generate_ticket_number()
+            assert next_num != colliding_num
+            assert int(next_num.split("-")[1]) == num1 + 2
+
+
+    def test_api_delete_ticket_with_audit_logs(
+        self, client, app, db, admin_user
+    ):
+        from app.models import AuditLog, Ticket
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            ticket = Ticket(
+                ticket_number="TKT-999002",
+                title="To be deleted",
+                description="desc",
+                type="incident",
+                priority="low",
+                created_by=admin_user.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            # Attach audit log referencing this ticket
+            audit = AuditLog(
+                user_id=admin_user.id,
+                action="create",
+                entity_type="ticket",
+                entity_id=ticket.id,
+                ticket_id=ticket.id,
+            )
+            db.session.add(audit)
+            db.session.commit()
+
+            resp = client.delete(f"/api/tickets/{ticket.id}")
+            assert resp.status_code == 200
+            assert resp.get_json()["message"] == "Ticket deleted successfully"
+
+            assert Ticket.query.get(ticket.id) is None
+            updated_audit = AuditLog.query.get(audit.id)
+            assert updated_audit is not None
+            assert updated_audit.ticket_id is None

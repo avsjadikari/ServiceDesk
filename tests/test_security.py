@@ -243,3 +243,74 @@ class TestStoredXssInlineHandlers:
         assert b"onclick=" not in resp.data
         assert b"onsubmit=" not in resp.data
         assert b'data-username="&#34;&gt;&lt;img src=x onerror=alert(1)&gt;"' in resp.data
+
+
+
+class TestClientIpAndReadiness:
+    def test_client_ip_parses_chain_and_truncates(self, app):
+        from app.utils import _client_ip
+
+        with app.test_request_context(
+            "/", headers={"X-Forwarded-For": "203.0.113.195, 70.41.3.18, 150.172.238.178"}
+        ):
+            ip = _client_ip()
+            assert ip == "203.0.113.195"
+
+        long_ip = "2001:0db8:85a3:0000:0000:8a2e:0370:7334:extra:overflow"
+        with app.test_request_context("/", headers={"X-Forwarded-For": long_ip}):
+            ip = _client_ip()
+            assert len(ip) <= 45
+
+    def test_ready_endpoint_generic_error_on_db_failure(self, client, monkeypatch):
+        from sqlalchemy import text
+        from app import db
+
+        def _fail(*args, **kwargs):
+            raise RuntimeError("SecretDBConnectionFailed: password=supersecret")
+
+        monkeypatch.setattr(db.session, "execute", _fail)
+        resp = client.get("/ready")
+        assert resp.status_code == 503
+        data = resp.get_json()
+        assert data["status"] == "not-ready"
+        assert "password" not in resp.get_data(as_text=True)
+        assert "supersecret" not in resp.get_data(as_text=True)
+
+
+class TestHardeningAndRegressionFixes:
+    def test_setup_complete_requires_admin_existence(self, app):
+        """Visiting /setup/complete without an existing admin redirects to wizard."""
+        from app.models import User, db
+
+        with app.app_context():
+            User.query.delete()
+            db.session.commit()
+
+            test_client = app.test_client()
+            resp = test_client.get("/setup/complete", follow_redirects=False)
+            assert resp.status_code == 302
+            assert resp.headers["Location"].endswith("/setup")
+            with test_client.session_transaction() as sess:
+                assert sess.get("setup_complete") is not True
+
+    def test_api_tickets_pagination(self, client, app, db, admin_user):
+        """API list endpoints respect limit and offset parameters."""
+        from app.models import Ticket
+
+        _login_admin(client)
+        with app.app_context():
+            for i in range(5):
+                t = Ticket(
+                    ticket_number=f"TKT-PAG-{i:03d}",
+                    title=f"Page Ticket {i}",
+                    type="incident",
+                    priority="low",
+                    created_by=admin_user.id,
+                )
+                db.session.add(t)
+            db.session.commit()
+
+        resp = client.get("/api/tickets?limit=2&offset=1")
+        assert resp.status_code == 200
+        items = resp.get_json()
+        assert len(items) == 2

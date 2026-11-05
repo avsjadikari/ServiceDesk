@@ -129,3 +129,98 @@ class TestAssetManagement:
             asset = Asset.query.get(asset.id)
             assert asset.assigned_to == regular_user.id
             assert asset.status == "active"
+
+
+    def test_delete_asset_with_linked_tickets(self, client, app, db, admin_user):
+        """Test deleting asset safely unlinks tickets referencing it"""
+        from app.models import Ticket
+
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            asset = Asset(
+                name="Server Rack A",
+                asset_type="hardware",
+                serial_number="SRV-RACK-01",
+                status="active",
+            )
+            db.session.add(asset)
+            db.session.commit()
+
+            ticket = Ticket(
+                ticket_number="TKT-999001",
+                title="Rack overheating",
+                description="Needs cooling check",
+                type="incident",
+                priority="high",
+                created_by=admin_user.id,
+                asset_id=asset.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/assets/{asset.id}/delete",
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Asset deleted successfully." in response.data
+
+            assert Asset.query.get(asset.id) is None
+            updated_ticket = Ticket.query.get(ticket.id)
+            assert updated_ticket is not None
+            assert updated_ticket.asset_id is None
+
+    def test_assign_and_unassign_asset_with_audit(
+        self, client, app, db, admin_user, regular_user
+    ):
+        """Test assigning and unassigning asset creates audit records"""
+        from app.models import AuditLog
+
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            asset = Asset(
+                name="Workstation 12",
+                asset_type="hardware",
+                serial_number="WS-12",
+                status="active",
+            )
+            db.session.add(asset)
+            db.session.commit()
+
+            # Assign
+            res = client.post(
+                f"/assets/{asset.id}/assign",
+                data={"user_id": str(regular_user.id)},
+                follow_redirects=True,
+            )
+            assert res.status_code == 200
+            assert Asset.query.get(asset.id).assigned_to == regular_user.id
+
+            assign_log = (
+                AuditLog.query.filter_by(action="assign_asset", entity_id=asset.id)
+                .first()
+            )
+            assert assign_log is not None
+            assert assign_log.details["assigned_to"] == regular_user.id
+
+            # Unassign with empty string
+            res = client.post(
+                f"/assets/{asset.id}/assign",
+                data={"user_id": ""},
+                follow_redirects=True,
+            )
+            assert res.status_code == 200
+            assert Asset.query.get(asset.id).assigned_to is None
+
+            unassign_log = (
+                AuditLog.query.filter_by(action="unassign_asset", entity_id=asset.id)
+                .first()
+            )
+            assert unassign_log is not None
+            assert unassign_log.details["previous_assigned_to"] == regular_user.id
