@@ -181,28 +181,38 @@ def get_mail_config() -> dict:
         "MAIL_DEFAULT_SENDER": current_app.config.get("MAIL_DEFAULT_SENDER"),
     }
     # Overlay DB-stored values; empty strings clear the override.
-    db_server = get_setting(MAIL_KEYS["mail_server"])
+    try:
+        rows = SystemSetting.query.filter(
+            SystemSetting.key.in_(MAIL_KEYS.values())
+        ).all()
+        db_map = {
+            r.key: r.value for r in rows if r.value is not None and r.value != ""
+        }
+    except (OperationalError, ProgrammingError):
+        return cfg
+
+    db_server = db_map.get(MAIL_KEYS["mail_server"])
     if db_server is not None:
         cfg["MAIL_SERVER"] = db_server
-    db_port = get_setting(MAIL_KEYS["mail_port"])
+    db_port = db_map.get(MAIL_KEYS["mail_port"])
     if db_port is not None:
         try:
             cfg["MAIL_PORT"] = int(db_port)
         except (TypeError, ValueError):
             pass
-    db_tls = get_setting(MAIL_KEYS["mail_use_tls"])
+    db_tls = db_map.get(MAIL_KEYS["mail_use_tls"])
     if db_tls is not None:
         cfg["MAIL_USE_TLS"] = db_tls.strip().lower() in ("true", "1", "on", "yes")
-    db_user = get_setting(MAIL_KEYS["mail_username"])
+    db_user = db_map.get(MAIL_KEYS["mail_username"])
     if db_user is not None:
         cfg["MAIL_USERNAME"] = db_user
-    db_pass = get_setting(MAIL_KEYS["mail_password"])
+    db_pass = db_map.get(MAIL_KEYS["mail_password"])
     if db_pass is not None:
         try:
             cfg["MAIL_PASSWORD"] = _decrypt_value(db_pass)
         except Exception:
             cfg["MAIL_PASSWORD"] = db_pass
-    db_sender = get_setting(MAIL_KEYS["mail_default_sender"])
+    db_sender = db_map.get(MAIL_KEYS["mail_default_sender"])
     if db_sender is not None:
         cfg["MAIL_DEFAULT_SENDER"] = db_sender
     return cfg

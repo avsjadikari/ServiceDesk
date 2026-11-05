@@ -230,9 +230,8 @@ def edit(ticket_id):
 
     if form.validate_on_submit():
         _apply_form_to_ticket(ticket, form)
+        log_ticket_audit(ticket, "update", commit=False)
         db.session.commit()
-
-        log_ticket_audit(ticket, "update")
 
         flash(f"Ticket {ticket.ticket_number} updated successfully.", "success")
         return redirect(url_for("tickets.view", ticket_id=ticket.id))
@@ -379,8 +378,10 @@ def link_asset(ticket_id):
         if ticket.asset_id is not None:
             old_asset = ticket.asset_id
             ticket.asset_id = None
+            log_ticket_audit(
+                ticket, "unlink_asset", {"previous_asset_id": old_asset}, commit=False
+            )
             db.session.commit()
-            log_ticket_audit(ticket, "unlink_asset", {"previous_asset_id": old_asset})
             flash("Asset unlinked successfully.", "success")
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
@@ -395,9 +396,8 @@ def link_asset(ticket_id):
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     ticket.asset_id = asset.id
+    log_ticket_audit(ticket, "link_asset", {"asset_id": asset.id}, commit=False)
     db.session.commit()
-
-    log_ticket_audit(ticket, "link_asset", {"asset_id": asset.id})
 
     flash("Asset linked successfully.", "success")
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
@@ -514,13 +514,13 @@ def _store_attachment(ticket, upload, safe_name, unique_name):
         uploaded_by=current_user.id,
     )
     db.session.add(attachment)
-    db.session.commit()
-
     log_ticket_audit(
         ticket,
         "upload_attachment",
         {"filename": safe_name, "size": file_size},
+        commit=False,
     )
+    db.session.commit()
     return True
 
 
