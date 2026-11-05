@@ -105,6 +105,7 @@ def index():
 def board():
     tickets = (
         Ticket.query.filter(Ticket.status.in_(TICKET_STATUSES[:-1]))
+        .options(joinedload(Ticket.assignee))
         .order_by(Ticket.created_at.desc())
         .all()
     )
@@ -173,7 +174,15 @@ def new():
 @tickets.route("/tickets/<int:ticket_id>")
 @login_required
 def view(ticket_id):
-    ticket = Ticket.query.get_or_404(ticket_id)
+    ticket = (
+        Ticket.query.options(
+            joinedload(Ticket.creator),
+            joinedload(Ticket.assignee),
+            joinedload(Ticket.asset),
+        )
+        .filter_by(id=ticket_id)
+        .first_or_404()
+    )
 
     if not can_view_ticket(current_user, ticket):
         abort(403)
@@ -189,13 +198,20 @@ def view(ticket_id):
     status_color = STATUS_COLORS.get(ticket.status, "secondary")
     priority_color = PRIORITY_COLORS.get(ticket.priority, "secondary")
 
+    attachments = (
+        Attachment.query.filter_by(ticket_id=ticket.id)
+        .options(joinedload(Attachment.uploader))
+        .order_by(Attachment.created_at.desc())
+        .all()
+    )
+
     return render_template(
         "tickets/view.html",
         ticket=ticket,
         comment_form=comment_form,
         attachment_form=AttachmentForm(),
         comments=comments,
-        attachments=ticket.attachments.order_by(Attachment.created_at.desc()).all(),
+        attachments=attachments,
         status_color=status_color,
         priority_color=priority_color,
         users=_agent_users(),

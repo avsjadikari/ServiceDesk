@@ -2,6 +2,7 @@ from flask import Blueprint, render_template, jsonify, request, abort
 from flask_login import login_required, current_user
 from datetime import datetime, timedelta
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 from app import db
 from app.models import Ticket, User, AuditLog
 from app.utils import (
@@ -149,5 +150,10 @@ def audit_logs():
     if not current_user.is_admin():
         abort(403)
 
-    logs = AuditLog.query.order_by(AuditLog.created_at.desc()).limit(100).all()
+    logs = (
+        AuditLog.query.options(joinedload(AuditLog.user))
+        .order_by(AuditLog.created_at.desc())
+        .limit(100)
+        .all()
+    )
     return render_template("analytics/audit_logs.html", logs=logs)

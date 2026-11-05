@@ -162,7 +162,8 @@ def apply_automation_rules(
 def _execute_automation_rule(ticket: Ticket, rule, commit: bool = True) -> None:
     if rule.action_type == "assign":
         assignee_id = (rule.action_config or {}).get("assign_to")
-        if not assignee_id or not User.query.get(assignee_id):
+        user = User.query.get(assignee_id) if assignee_id else None
+        if not user or not user.is_active or not user.is_agent():
             return
         ticket.assigned_to = assignee_id
         ticket.promote_status_if_new()

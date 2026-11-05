@@ -1,5 +1,7 @@
-from flask import Blueprint, jsonify, request
+import os
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.enums import (
     TICKET_PRIORITIES,
@@ -42,7 +44,8 @@ def get_tickets():
     limit = min(request.args.get("limit", 100, type=int), 500)
     offset = max(request.args.get("offset", 0, type=int), 0)
     tickets = (
-        Ticket.query.order_by(Ticket.created_at.desc())
+        Ticket.query.options(joinedload(Ticket.assignee))
+        .order_by(Ticket.created_at.desc())
         .limit(limit)
         .offset(offset)
         .all()
@@ -225,6 +228,17 @@ def delete_ticket(ticket_id):
     AuditLog.query.filter_by(ticket_id=ticket.id).update(
         {"ticket_id": None}, synchronize_session=False
     )
+    upload_dir = current_app.config.get("UPLOAD_FOLDER")
+    if upload_dir:
+        real_dir = os.path.realpath(upload_dir)
+        for att in ticket.attachments.all():
+            if att.filepath:
+                fpath = os.path.realpath(os.path.join(upload_dir, att.filepath))
+                if fpath.startswith(real_dir + os.sep) and os.path.isfile(fpath):
+                    try:
+                        os.remove(fpath)
+                    except OSError:
+                        pass
     db.session.delete(ticket)
     db.session.commit()
 
@@ -299,7 +313,8 @@ def get_assets():
     limit = min(request.args.get("limit", 100, type=int), 500)
     offset = max(request.args.get("offset", 0, type=int), 0)
     assets = (
-        Asset.query.order_by(Asset.name.asc())
+        Asset.query.options(joinedload(Asset.owner))
+        .order_by(Asset.name.asc())
         .limit(limit)
         .offset(offset)
         .all()

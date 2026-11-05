@@ -1,5 +1,6 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from flask_login import login_required, current_user
+from sqlalchemy.orm import joinedload
 from app import db, limiter
 from app.models import Ticket, Article, Comment
 from app.forms import TicketForm, CommentForm
@@ -44,7 +45,8 @@ def knowledge():
 
     page = request.args.get("page", 1, type=int)
     articles = (
-        query.order_by(Article.updated_at.desc())
+        query.options(joinedload(Article.author))
+        .order_by(Article.updated_at.desc())
         .paginate(page=page, per_page=20, error_out=False)
     )
 
@@ -134,6 +136,7 @@ def view_ticket(ticket_id):
 
     comments = (
         Comment.query.filter_by(ticket_id=ticket.id, is_internal=False)
+        .options(joinedload(Comment.user))
         .order_by(Comment.created_at.asc())
         .all()
     )

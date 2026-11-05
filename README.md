@@ -221,10 +221,13 @@ ServiceDesk/
 │   ├── models.py            # SQLAlchemy models (User, Ticket, Article, …)
 │   ├── forms.py             # WTForms definitions
 │   ├── utils.py             # Helper functions (ticket numbers, SLA, automation)
+│   ├── tickets_lifecycle.py # Centralized ticket domain operations (transitions, unassign)
+│   ├── policy.py            # RBAC authorization policies
 │   ├── i18n.py              # Zero-dependency JSON i18n engine & context processor
 │   ├── sanitize.py          # Bleach HTML/markdown sanitization
 │   ├── security.py          # Token serialization & password reset security
 │   ├── email_utils.py       # Notification mailers
+│   ├── bootstrap/           # Modular composition root (extensions, hooks, filters)
 │   ├── translations/        # Lightweight JSON localization catalogs
 │   │   ├── en.json          # English (default)
 │   │   ├── es.json          # Spanish
@@ -244,7 +247,7 @@ ServiceDesk/
 │   │   ├── api.py           # REST API endpoints
 │   │   └── setup.py         # First-time setup wizard
 │   └── templates/           # Jinja2 UI templates (grouped by feature)
-├── tests/                   # Pytest suite (119 tests covering all features)
+├── tests/                   # Pytest suite (315 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Entry point (`python run.py`)
 ├── requirements.txt         # Python dependencies
@@ -274,29 +277,24 @@ ServiceDesk/
 7. Set up log aggregation and a database backup strategy.
 8. Consider LDAP/AD integration or SSO for enterprise authentication.
 
-## Known issues
-
-- **Dashboard 500 on unassigned tickets** — `dashboard.html` renders `p.agent.full_name` for the performance table without a `None` guard; if a ticket has no assigned agent, the dashboard raises `TypeError` (HTTP 500). Fix: guard with `p.agent.full_name if p.agent else 'Unassigned'`.
-- **REST API enum mismatch** — `app/routes/api.py` accepts ticket types/statuses (`service_request`, `change`, `open`) that differ from the DB CHECK constraints in `app/models.py`, causing HTTP 500 on some writes. Fix: share one enum module between model and API.
-- **Dependency CVE pins** — `requirements.txt` pins `gunicorn==21.2.0`, `cryptography==43.0.1`, `Pillow==10.4.0`, all of which have published CVEs. Fix: upgrade pins.
-- Remaining open security findings are tracked in `SECURITY.md`.
-
 ## Completed modernization and hardening
 
 | Component / Feature | State | Implementation Details |
 |---------------------|-------|------------------------|
 | Multi-Language (i18n) | **Implemented** | Lightweight zero-dependency JSON catalogs (`app/i18n.py`) supporting English, Spanish, French, German, Japanese, Arabic (with RTL), and Sinhala. Instant language switching at `/set-lang/<code>` with open redirect validation. |
-| Kanban Workflow Board | **Implemented** | Interactive HTML5 drag-and-drop board at `/tickets/board` with 5 workflow columns and optimistic status sync. |
-| Operational Dashboard | **Implemented** | 14-day activity trend chart, real-time SLA breach alert banner, and agent performance tracking metrics. |
-| Interactive Analytics Suite | **Implemented** | Deep analytics at `/analytics` with 7/30/90-day timeframes, MTTR metrics, category distribution, and one-click CSV export. |
+| Kanban Workflow Board | **Implemented** | Interactive HTML5 drag-and-drop board at `/tickets/board` with 5 active workflow columns, modal dialogs isolated in `{% block modals %}`, and atomic `/tickets/<id>/update-status` transitions. |
+| Operational Dashboard | **Implemented** | 14-day activity trend chart, real-time SLA breach alert banner, and agent performance tracking metrics with null-safe avatar fallbacks. |
+| Interactive Analytics Suite | **Implemented** | Deep analytics at `/analytics` with 7/30/90-day timeframes, MTTR metrics with optional `days` boundary, category distribution, and one-click CSV export. |
 | Customer Support Portal | **Implemented** | Search hero, service categories, knowledge spotlight, and 5-stage ticket lifecycle stepper. |
-| Setup Wizard Security | **Implemented** | Generates secure random temporary passwords via `secrets`, uses `User.set_password()`, enforces `must_change_password`. |
-| Database Migrations | **Implemented** | Flask-Migrate (Alembic) configured for schema versioning. |
-| Environment Config | **Implemented** | `.env.example` shipped in repository; requires explicit `SECRET_KEY`. |
-| Input Sanitization | **Implemented** | `app/sanitize.py` renders markdown safely with Bleach (`| markdown_safe`). |
-| Automated Test Suite | **Implemented** | 119 unit and integration tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
-| Ticket Attachment Display | **Implemented** | `tickets/view.html` now lists and renders ticket attachments (filename, uploader, size) with access checks; previously the section was silently blank. |
-| 2FA Login CSRF | **Implemented** | `/login-2fa` renders its CSRF token so the TOTP/recovery POST passes CSRFProtect; previously the 2FA POST was rejected with HTTP 400 (missing token). |
+| Centralized Ticket Lifecycle | **Implemented** | `app/tickets_lifecycle.py` unifies ticket creation, status changes, assignments, unassignment audit logging, and email notifications. |
+| Setup Wizard Security | **Implemented** | Generates secure random temporary passwords via `secrets`, enforces `must_change_password`, and requires `SETUP_TOKEN` in production. |
+| Database Migrations & Indexing | **Implemented** | Flask-Migrate (Alembic) schema versioning. Indexed timestamp columns (`resolved_at`, `closed_at`, `sla_deadline`) for performant analytical queries. |
+| Environment Config | **Implemented** | `.env.example` shipped in repository; requires explicit `SECRET_KEY` and supports canonical `SERVER_NAME`. |
+| Input Sanitization | **Implemented** | `app/sanitize.py` renders markdown safely with Bleach (`\| markdown_safe`). |
+| Automated Test Suite | **Implemented** | 315 unit, integration, characterization, and workflow tests across auth, tickets, assets, knowledge, setup, analytics, and i18n (`pytest`). |
+| Ticket Attachment Security | **Implemented** | `tickets/view.html` renders attachments with UUID storage, MIME prefix checks, magic byte sniffing, and path traversal blocking. |
+| 2FA Login CSRF | **Implemented** | `/login-2fa` renders its CSRF token so the TOTP/recovery POST passes CSRFProtect. |
+| Asset Link Robustness | **Implemented** | Foreign key verification on asset linking; clean unlinking support (`asset_id=0`) with audit trail logging; active user filtering. |
 
 
 

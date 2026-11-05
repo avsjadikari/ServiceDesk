@@ -38,7 +38,11 @@ def index():
 @assets.route("/assets/<int:asset_id>")
 @login_required
 def view(asset_id):
-    asset = Asset.query.get_or_404(asset_id)
+    asset = (
+        Asset.query.options(joinedload(Asset.owner))
+        .filter_by(id=asset_id)
+        .first_or_404()
+    )
 
     if not current_user.is_agent() and asset.assigned_to != current_user.id:
         abort(403)

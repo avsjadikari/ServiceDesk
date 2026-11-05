@@ -1221,7 +1221,7 @@ class TestAutomationAssign:
     ):
         # Guards the refactored _execute_automation_rule: a missing/unknown
         # assign target is a no-op; escalate only promotes high|critical.
-        from app.models import AutomationRule
+        from app.models import AutomationRule, User
         from app.utils import _execute_automation_rule
 
         with app.app_context():
@@ -1239,7 +1239,26 @@ class TestAutomationAssign:
             db.session.add(ticket)
             db.session.commit()
 
-            for config in ({}, {"assign_to": 999999}):
+            inactive_user = User(
+                username="inactive_agent_auto",
+                email="inactive_agent_auto@test.com",
+                full_name="Inactive Agent",
+                role="agent",
+                is_active=False,
+            )
+            inactive_user.set_password("Agent@123456")
+            regular_u = User(
+                username="regular_user_auto",
+                email="regular_user_auto@test.com",
+                full_name="Regular User Auto",
+                role="user",
+                is_active=True,
+            )
+            regular_u.set_password("User@123456")
+            db.session.add_all([inactive_user, regular_u])
+            db.session.commit()
+
+            for config in ({}, {"assign_to": 999999}, {"assign_to": inactive_user.id}, {"assign_to": regular_u.id}):
                 rule = AutomationRule(
                     name="auto-assign",
                     trigger_type="ticket_created",
@@ -2193,3 +2212,47 @@ class TestReassuranceCopy:
             updated_audit = AuditLog.query.get(audit.id)
             assert updated_audit is not None
             assert updated_audit.ticket_id is None
+
+    def test_api_delete_ticket_cleans_up_attachment_file(
+        self, client, app, db, admin_user
+    ):
+        import os
+        from app.models import Attachment, Ticket
+
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+
+            upload_dir = app.config.get("UPLOAD_FOLDER")
+            os.makedirs(upload_dir, exist_ok=True)
+            test_filename = "delete_ticket_test.txt"
+            file_path = os.path.join(upload_dir, test_filename)
+            with open(file_path, "w") as f:
+                f.write("temporary attachment content")
+
+            ticket = Ticket(
+                ticket_number="TKT-999003",
+                title="Ticket with attachment",
+                description="desc",
+                type="incident",
+                priority="low",
+                created_by=admin_user.id,
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            attachment = Attachment(
+                ticket_id=ticket.id,
+                filename="original.txt",
+                filepath=test_filename,
+                file_size=28,
+                uploaded_by=admin_user.id,
+            )
+            db.session.add(attachment)
+            db.session.commit()
+
+            assert os.path.isfile(file_path)
+
+            resp = client.delete(f"/api/tickets/{ticket.id}")
+            assert resp.status_code == 200
+            assert Ticket.query.get(ticket.id) is None
+            assert not os.path.isfile(file_path)

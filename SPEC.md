@@ -352,10 +352,13 @@ ServiceDesk/
 │   ├── models.py            # SQLAlchemy models (User, Ticket, Article, Asset, …)
 │   ├── forms.py             # WTForms form classes & validators
 │   ├── utils.py             # Helper functions (ticket numbers, SLA, automation)
+│   ├── tickets_lifecycle.py # Domain lifecycle operations (create, transition, unassign)
+│   ├── policy.py            # RBAC access control policies
 │   ├── i18n.py              # Zero-dependency JSON i18n engine & context processor
 │   ├── sanitize.py          # Bleach HTML/markdown sanitization filter
 │   ├── security.py          # Token serialization & password reset security
 │   ├── email_utils.py       # Notification mailer utilities
+│   ├── bootstrap/           # Modular initialization (extensions, filters, hooks)
 │   ├── translations/        # Lightweight JSON localization catalogs
 │   │   ├── en.json          # English (default)
 │   │   ├── es.json          # Spanish
@@ -380,7 +383,7 @@ ServiceDesk/
 │       ├── js/              # Client-side scripts (Kanban DND, charts, etc.)
 │       └── img/             # Static assets
 ├── migrations/              # Flask-Migrate / Alembic database migrations
-├── tests/                   # Pytest suite (119 tests covering all features)
+├── tests/                   # Pytest suite (315 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Application entry point
 ├── requirements.txt         # Python dependencies
