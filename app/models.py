@@ -300,7 +300,7 @@ class ArticleVersion(db.Model):
     version = db.Column(db.Integer, nullable=False)
     content = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    created_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    created_by = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
 
     def __repr__(self):
         return f"<ArticleVersion {self.article_id} v{self.version}>"
@@ -394,7 +394,7 @@ class AutomationRule(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(200), nullable=False)
     description = db.Column(db.Text)
-    trigger_type = db.Column(db.String(50), nullable=False)
+    trigger_type = db.Column(db.String(50), nullable=False, index=True)
     trigger_conditions = db.Column(db.JSON)
     action_type = db.Column(db.String(50), nullable=False)
     action_config = db.Column(db.JSON)
@@ -417,7 +417,7 @@ class SystemSetting(db.Model):
     updated_at = db.Column(
         db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
     )
-    updated_by = db.Column(db.Integer, db.ForeignKey("users.id"))
+    updated_by = db.Column(db.Integer, db.ForeignKey("users.id"), index=True)
 
     def __repr__(self):
         return f"<SystemSetting {self.key}={self.value!r}>"

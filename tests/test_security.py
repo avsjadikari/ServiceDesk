@@ -314,3 +314,12 @@ class TestHardeningAndRegressionFixes:
         assert resp.status_code == 200
         items = resp.get_json()
         assert len(items) == 2
+
+    def test_db_init_and_backup_require_admin(self, client, app, regular_user):
+        """Non-admin cannot access db_init or db_backup."""
+        with app.app_context():
+            client.post("/login", data={"username": "user", "password": "User@123456"})
+            resp_init = client.get("/admin/db/init")
+            assert resp_init.status_code == 302
+            resp_backup = client.get("/admin/db/backup")
+            assert resp_backup.status_code == 302

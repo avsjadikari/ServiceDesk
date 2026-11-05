@@ -12,9 +12,9 @@ from flask import (
     send_file,
     current_app,
 )
-from flask_login import login_user, current_user
+from flask_login import login_user, current_user, login_required
 from sqlalchemy import text
-from app import db
+from app import db, limiter
 from app.models import User
 from app.seed import seed_accounts, seed_articles
 from app.forms import SetupForm
@@ -179,8 +179,10 @@ def complete():
 
 
 @setup.route("/admin/db/init", methods=["GET", "POST"])
+@login_required
+@limiter.limit("5 per hour")
 def db_init():
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_admin():
         flash("Access denied. Admin only.", "danger")
         return redirect(url_for("main.dashboard"))
 
@@ -199,6 +201,11 @@ def db_init():
 
     if request.method == "POST":
         try:
+            current_app.logger.warning(
+                "Database re-initialization executed by admin user_id=%s username=%s",
+                current_user.id,
+                current_user.username,
+            )
             db.session.commit()
 
             db_uri = current_app.config.get("SQLALCHEMY_DATABASE_URI", "")
@@ -237,8 +244,10 @@ def db_init():
 
 
 @setup.route("/admin/db/backup")
+@login_required
+@limiter.limit("10 per hour")
 def db_backup():
-    if not current_user.is_authenticated or not current_user.is_admin():
+    if not current_user.is_admin():
         flash("Access denied. Admin only.", "danger")
         return redirect(url_for("main.dashboard"))
 

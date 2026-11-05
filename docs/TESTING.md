@@ -5,7 +5,7 @@
 - pytest + pytest-flask, temp SQLite per test, CSRF disabled (re-enable per-test where needed — see `TestTwoFactorCsrf` in `tests/test_auth.py`).
 - Characterization-first (Feathers): pin observed behavior, not imagined specs. Probe with a deliberately wrong assertion, read the failure, pin the real value.
 - Role matrix: admin / agent / regular / anonymous exercised on every authorization branch.
-- Green gate: `.venv/bin/python -m pytest` (322 tests, ~75s). Coverage: `pytest --cov=app --cov-report=term-missing`.
+- Green gate: `.venv/bin/python -m pytest` (324 tests, ~76s). Coverage: `pytest --cov=app --cov-report=term-missing`.
 
 ## Safety Net Map
 

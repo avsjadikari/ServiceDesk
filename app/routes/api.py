@@ -294,9 +294,9 @@ def get_articles():
 @login_required
 def get_article(article_id):
     article = (
-        Article.query.filter(
-            Article.id == article_id, Article.status == "published"
-        ).first_or_404()
+        Article.query.options(joinedload(Article.author))
+        .filter(Article.id == article_id, Article.status == "published")
+        .first_or_404()
     )
 
     return jsonify(

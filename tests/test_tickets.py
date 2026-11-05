@@ -1331,6 +1331,53 @@ class TestAutomationAssign:
             _execute_automation_rule(ticket, escalate)
             assert ticket.priority == "critical"
 
+    def test_automation_trigger_conditions_matching(
+        self, app, db, admin_user, agent_user
+    ):
+        from app.models import AutomationRule
+        from app.utils import _execute_automation_rule
+
+        with app.app_context():
+            ticket = Ticket(
+                ticket_number="TKT-300003",
+                title="Condition matching test",
+                description="desc",
+                created_by=admin_user.id,
+                status="new",
+                assigned_to=None,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            # Rule with non-matching condition (category == Software)
+            rule_non_matching = AutomationRule(
+                name="assign-software",
+                trigger_type="ticket_created",
+                trigger_conditions={"category": "Software"},
+                action_type="assign",
+                action_config={"assign_to": agent_user.id},
+                is_active=True,
+                priority=10,
+            )
+            _execute_automation_rule(ticket, rule_non_matching)
+            assert ticket.assigned_to is None
+
+            # Rule with matching condition (category == Hardware)
+            rule_matching = AutomationRule(
+                name="assign-hardware",
+                trigger_type="ticket_created",
+                trigger_conditions={"category": "Hardware"},
+                action_type="assign",
+                action_config={"assign_to": agent_user.id},
+                is_active=True,
+                priority=10,
+            )
+            _execute_automation_rule(ticket, rule_matching)
+            assert ticket.assigned_to == agent_user.id
+
 
 class TestLinkAsset:
     """Characterize /tickets/<id>/link-asset (link_asset:344-365)."""

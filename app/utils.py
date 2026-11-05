@@ -159,7 +159,19 @@ def apply_automation_rules(
         _execute_automation_rule(ticket, rule, commit)
 
 
+def _matches_conditions(ticket: Ticket, conditions: dict | None) -> bool:
+    if not conditions or not isinstance(conditions, dict):
+        return True
+    for key, expected in conditions.items():
+        if getattr(ticket, key, None) != expected:
+            return False
+    return True
+
+
 def _execute_automation_rule(ticket: Ticket, rule, commit: bool = True) -> None:
+    if not _matches_conditions(ticket, rule.trigger_conditions):
+        return
+
     if rule.action_type == "assign":
         assignee_id = (rule.action_config or {}).get("assign_to")
         user = User.query.get(assignee_id) if assignee_id else None

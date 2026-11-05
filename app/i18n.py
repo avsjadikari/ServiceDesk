@@ -1,6 +1,9 @@
-import os
 import json
+import logging
+import os
 from flask import Blueprint, session, request, redirect, url_for, g
+
+logger = logging.getLogger(__name__)
 
 i18n_bp = Blueprint("i18n", __name__)
 
@@ -33,7 +36,7 @@ def load_translations() -> dict:
                     with open(fpath, "r", encoding="utf-8") as f:
                         translations[lang_code] = json.load(f)
                 except Exception as exc:
-                    print(f"Error loading translation for {lang_code}: {exc}")
+                    logger.warning("Error loading translation for %s: %s", lang_code, exc)
 
     _TRANSLATIONS = translations
     return _TRANSLATIONS

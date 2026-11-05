@@ -383,7 +383,7 @@ ServiceDesk/
 │       ├── js/              # Client-side scripts (Kanban DND, charts, etc.)
 │       └── img/             # Static assets
 ├── migrations/              # Flask-Migrate / Alembic database migrations
-├── tests/                   # Pytest suite (322 tests covering all features)
+├── tests/                   # Pytest suite (324 tests covering all features)
 ├── config.py                # Configuration classes (development / production)
 ├── run.py                   # Application entry point
 ├── requirements.txt         # Python dependencies
