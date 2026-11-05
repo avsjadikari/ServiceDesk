@@ -233,6 +233,10 @@ class TestAnalyticsCharacterization:
             assert data["active_breached"] == 1
             assert set(data.keys()) >= {"compliance_rate", "met", "breached", "total", "mttr_hours", "active_breached"}
 
+            # Bounded with days filter
+            bounded = client.get("/analytics/sla?days=1").get_json()
+            assert bounded["mttr_hours"] == 8.0
+
     def test_audit_logs_admin_access(self, client, app, db, admin_user):
         with app.app_context():
             client.post("/login", data={"username": "admin", "password": "Admin@123456"})

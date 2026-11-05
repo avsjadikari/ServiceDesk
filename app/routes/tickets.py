@@ -27,7 +27,7 @@ from app.enums import (
     TICKET_STATUSES,
 )
 from app.forms import AttachmentForm, CommentForm, TicketFilterForm, TicketForm
-from app.models import Attachment, Comment, Ticket, User
+from app.models import Asset, Attachment, Comment, Ticket, User
 from app import tickets_lifecycle
 from app.policy import can_view_ticket, web_agent_required
 from app.utils import (
@@ -357,20 +357,33 @@ def add_comment(ticket_id):
 @web_agent_required
 def link_asset(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
-    asset_id = request.form.get("asset_id")
+    raw_asset_id = request.form.get("asset_id")
 
-    if asset_id:
-        asset_id = _to_int(asset_id)
-        if asset_id is None:
-            flash("Invalid asset.", "danger")
-            return redirect(url_for("tickets.view", ticket_id=ticket_id))
-        ticket.asset_id = asset_id
-        db.session.commit()
+    if not raw_asset_id or str(raw_asset_id).strip() in ("", "0"):
+        if ticket.asset_id is not None:
+            old_asset = ticket.asset_id
+            ticket.asset_id = None
+            db.session.commit()
+            log_ticket_audit(ticket, "unlink_asset", {"previous_asset_id": old_asset})
+            flash("Asset unlinked successfully.", "success")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-        log_ticket_audit(ticket, "link_asset", {"asset_id": asset_id})
+    asset_id = _to_int(raw_asset_id)
+    if asset_id is None:
+        flash("Invalid asset.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-        flash("Asset linked successfully.", "success")
+    asset = Asset.query.get(asset_id)
+    if asset is None:
+        flash("Asset does not exist.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
+    ticket.asset_id = asset.id
+    db.session.commit()
+
+    log_ticket_audit(ticket, "link_asset", {"asset_id": asset.id})
+
+    flash("Asset linked successfully.", "success")
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
 

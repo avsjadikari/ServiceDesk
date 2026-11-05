@@ -21,6 +21,10 @@
 | Kanban board modal click interception: `.main-content` CSS animation creates stacking context, placing backdrop over `#statusModal` and freezing UI | `templates/tickets/board.html`, `base.html` | UI/CSS bug | high | S | high | **resolved 2026-11-05** — rendered in `{% block modals %}` outside `<main>`, attached directly to `document.body` (`d5b5b24`) |
 | Kanban split async requests: concurrent `Promise.all([updateStatus, assign, comment])` caused race conditions, comment loss, and SQLite locks | `routes/tickets.py`, `board.html` | concurrency bug | high | M | high | **resolved 2026-11-05** — consolidated into single atomic `POST /tickets/<id>/update-status` wrapped in one DB transaction (`d5b5b24`) |
 | Kanban board included closed tickets in query | `routes/tickets.py:106` | workflow bug | med | S | med | **resolved 2026-11-05** — filtered via `Ticket.status.in_(TICKET_STATUSES[:-1])` (`80b1ab8`) |
+| Modals inside animated `.main-content` and table `<tbody>` trapped behind backdrops | `templates/auth/profile.html`, `templates/knowledge/versions.html` | UI/CSS bug | high | S | high | **resolved 2026-11-05** — moved to `{% block modals %}` outside `<main>` |
+| Unguarded `link_asset` crashes with 500 on non-existent `asset_id` and missing unlink support | `routes/tickets.py:355-382` | robustness | high | S | high | **resolved 2026-11-05** — validated `Asset` exists and added unlink branch with audit |
+| Inactive users selectable in asset assignment choices | `routes/assets.py:55,103` | logic/integrity | med | S | med | **resolved 2026-11-05** — filtered active users, preserved current owner in edit form |
+| Unbounded in-memory MTTR query and unindexed timestamp columns | `routes/analytics.py:82`, `models.py:186` | performance | med | S | med | **resolved 2026-11-05** — added optional `days` filter and `index=True` on `resolved_at`, `closed_at`, `sla_deadline` |
 
 ## Smell Inventory
 

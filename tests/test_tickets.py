@@ -1359,6 +1359,63 @@ class TestLinkAsset:
             assert b"Invalid asset." in response.data
             assert Ticket.query.get(ticket.id).asset_id is None
 
+    def test_link_asset_non_existent_asset_flashes_error(self, client, app, db, admin_user):
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-250004",
+                title="Non-existent asset test",
+                description="d",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/link-asset",
+                data={"asset_id": "999999"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Asset does not exist." in response.data
+            assert Ticket.query.get(ticket.id).asset_id is None
+
+    def test_unlink_asset_success_with_audit(self, client, app, db, admin_user):
+        from app.models import Asset, AuditLog
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            asset = Asset(name="Server-Rack-1", asset_type="server", status="active")
+            db.session.add(asset)
+            db.session.commit()
+            ticket = Ticket(
+                ticket_number="TKT-250005",
+                title="Unlink test",
+                description="d",
+                created_by=admin_user.id,
+                asset_id=asset.id,
+                type="incident",
+                priority="medium",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/link-asset",
+                data={"asset_id": "0"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Asset unlinked successfully." in response.data
+            assert Ticket.query.get(ticket.id).asset_id is None
+            assert (
+                AuditLog.query.filter_by(action="unlink_asset", entity_id=ticket.id).count()
+                == 1
+            )
+
 
 class TestAttachmentBranches:
     """Characterize upload validation branches (upload_attachment:402,406-409,

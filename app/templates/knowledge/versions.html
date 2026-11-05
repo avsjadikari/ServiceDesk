@@ -28,22 +28,27 @@
                         </button>
                     </td>
                 </tr>
-                <div class="modal fade" id="versionModal{{ version.id }}" tabindex="-1">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title">Version {{ version.version }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                            </div>
-                            <div class="modal-body">
-                                <pre style="white-space: pre-wrap;">{{ version.content }}</pre>
-                            </div>
-                        </div>
-                    </div>
-                </div>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+{% endblock %}
+
+{% block modals %}
+{% for version in versions %}
+<div class="modal fade" id="versionModal{{ version.id }}" tabindex="-1">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Version {{ version.version }}</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body">
+                <pre style="white-space: pre-wrap;">{{ version.content }}</pre>
+            </div>
+        </div>
+    </div>
+</div>
+{% endfor %}
 {% endblock %}

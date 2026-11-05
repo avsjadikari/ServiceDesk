@@ -224,3 +224,27 @@ class TestAssetManagement:
             )
             assert unassign_log is not None
             assert unassign_log.details["previous_assigned_to"] == regular_user.id
+
+    def test_asset_form_excludes_inactive_users(
+        self, client, app, db, admin_user, regular_user
+    ):
+        """Test asset create form excludes inactive/disabled users"""
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+            disabled_user = User(
+                username="disabled_test_user",
+                email="disabled@servicedesk.local",
+                full_name="Disabled Person",
+                role="user",
+                is_active=False,
+            )
+            disabled_user.set_password("Pass@123456")
+            db.session.add(disabled_user)
+            db.session.commit()
+
+            response = client.get("/assets/new")
+            assert response.status_code == 200
+            assert b"Disabled Person" not in response.data
+            assert regular_user.full_name.encode() in response.data

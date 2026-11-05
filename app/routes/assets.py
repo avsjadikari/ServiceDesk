@@ -53,8 +53,11 @@ def new():
         abort(403)
 
     form = AssetForm()
+    active_users = (
+        User.query.filter_by(is_active=True).order_by(User.full_name.asc()).all()
+    )
     form.assigned_to.choices = [(0, "Unassigned")] + [
-        (u.id, u.full_name) for u in User.query.all()
+        (u.id, u.full_name) for u in active_users
     ]
 
     if form.validate_on_submit():
@@ -98,9 +101,15 @@ def edit(asset_id):
 
     asset = Asset.query.get_or_404(asset_id)
     form = AssetForm(obj=asset)
-    form.assigned_to.choices = [(0, "Unassigned")] + [
-        (u.id, u.full_name) for u in User.query.all()
-    ]
+    active_users = (
+        User.query.filter_by(is_active=True).order_by(User.full_name.asc()).all()
+    )
+    choices = [(0, "Unassigned")] + [(u.id, u.full_name) for u in active_users]
+    if asset.owner and not asset.owner.is_active:
+        inactive_choice = (asset.owner.id, f"{asset.owner.full_name} (Inactive)")
+        if inactive_choice not in choices:
+            choices.append(inactive_choice)
+    form.assigned_to.choices = choices
 
     if form.validate_on_submit():
         asset.name = form.name.data

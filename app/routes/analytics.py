@@ -79,11 +79,17 @@ def sla():
 
     sla_data = calculate_sla_compliance()
 
-    resolved_pairs = (
-        db.session.query(Ticket.created_at, Ticket.resolved_at)
-        .filter(Ticket.resolved_at.isnot(None), Ticket.created_at.isnot(None))
-        .all()
+    days = request.args.get("days", type=int)
+    resolved_query = db.session.query(
+        Ticket.created_at, Ticket.resolved_at
+    ).filter(
+        Ticket.resolved_at.isnot(None), Ticket.created_at.isnot(None)
     )
+    if days and days > 0:
+        start_date = datetime.utcnow() - timedelta(days=days)
+        resolved_query = resolved_query.filter(Ticket.resolved_at >= start_date)
+
+    resolved_pairs = resolved_query.all()
     valid_res_times = [
         (r - c).total_seconds() / 3600 for c, r in resolved_pairs if r and c
     ]

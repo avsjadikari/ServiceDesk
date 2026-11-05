@@ -90,7 +90,9 @@
         </div>
     </div>
 </div>
+{% endblock %}
 
+{% block modals %}
 {% if current_user.two_factor_enabled %}
 <div class="modal fade" id="disable2faModal" tabindex="-1">
     <div class="modal-dialog">

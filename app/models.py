@@ -183,10 +183,10 @@ class Ticket(db.Model):
 
     asset_id = db.Column(db.Integer, db.ForeignKey("assets.id", ondelete="SET NULL"))
 
-    sla_deadline = db.Column(db.DateTime)
+    sla_deadline = db.Column(db.DateTime, index=True)
     first_response_at = db.Column(db.DateTime)
-    resolved_at = db.Column(db.DateTime)
-    closed_at = db.Column(db.DateTime)
+    resolved_at = db.Column(db.DateTime, index=True)
+    closed_at = db.Column(db.DateTime, index=True)
 
     created_at = db.Column(db.DateTime, default=datetime.utcnow, index=True)
     updated_at = db.Column(
