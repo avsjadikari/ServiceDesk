@@ -12,6 +12,7 @@ Flask monolith, 1 maintainer, ~50 active users, real production data. SQLite dev
 |---|---|---|
 | `app/__init__.py` | Composition root: factory, config, wiring, temp-title hooks, seed accounts | heavy (intended) |
 | `app/routes/*` | HTTP adapters (controllers) + a large share of business orchestration | heavy (intended) |
+| `app/tickets_lifecycle.py` | Ticket lifecycle domain operations: create, transition, assign, unassign, comments, and audit trail wiring | partial (SQLAlchemy models + utils) |
 | `app/forms.py` | Request validation / WTForms | WTForms |
 | `app/models.py` | Entities **and** persistence (SQLAlchemy) fused | heavy (accepted) |
 | `app/utils.py` | Domain helpers: numbering, SLA, audit, automation, metrics, upload sniff, presentation colors | partial (`current_app` only in SLA defaults) |
@@ -24,7 +25,8 @@ Flask monolith, 1 maintainer, ~50 active users, real production data. SQLite dev
 ## Dependency Direction (as-built)
 
 ```
-routes/* ──► models.py  utils.py  enums.py  forms.py  email_utils.py  settings_store.py
+routes/* ──► tickets_lifecycle.py ──► models.py  utils.py  enums.py
+routes/* ──► forms.py  email_utils.py  settings_store.py
 models.py ──► app(db)  enums.py
 utils.py  ──► app(db)  models.py  enums.py
 email_utils ──► (flask_mail / smtplib)          (leaf detail)
@@ -264,3 +266,4 @@ upgrade seam already.
 | 2026-10-08 | Initial map, 7-row diagnostic (3/7), boundary policy + debt map. `calculate_sla_deadline` made pure. |
 | 2026-10-08 | Data-layer DDIA audit: portability clean, isolation/races assessed, replication/derived-data decisions, 6/7 diagnostic. |
 | 2026-10-08 | Domain-language audit: context map, ubiquitous-language glossary, core-domain strategy, 9/10 diagnostic. |
+| 2026-11-05 | Extracted `tickets_lifecycle` seam (`unassign_ticket`, atomic status/assign/comment transition); added `{% block modals %}` in `base.html` outside animated container to prevent CSS stacking context traps. |

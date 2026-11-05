@@ -28,3 +28,13 @@ Do not commit real secrets in `.env`. Use SQLite for local development and Postg
 
 The app uses `secrets` for password reset tokens (`app/security.py`), Flask-Limiter for per-IP and per-endpoint rate limits, Flask-Talisman in production for security headers and HSTS, and `itsdangerous` to sign reset tokens. The `/set-lang/<lang_code>` route verifies `request.referrer` against `request.host_url` to prevent open redirect vulnerabilities. The default seed accounts in `__init__.py` get randomly generated passwords logged at startup; never set a hardcoded default password. Account lockout (`LOGIN_MAX_ATTEMPTS` / `LOGIN_LOCKOUT_MINUTES`) is enforced in `auth.login`. Markdown rendered into pages goes through the `| markdown_safe` Jinja filter, which sanitises with bleach.
 
+## UI & Template Guidelines
+- Never place Bootstrap modal markup inside containers with CSS `animation`, `transform`, `filter`, `perspective`, or `contain` (such as `.main-content`), which create isolated stacking contexts.
+- Always render modals in `{% block modals %}{% endblock %}` defined outside `<main>` directly before closing scripts in `app/templates/base.html`, or attach them to `document.body`. This prevents backdrop elements (`.modal-backdrop` at `z-index: 1050`) from trapping and freezing modal interaction.
+
+## API & State Transitions
+- Never split dependent entity state updates into concurrent asynchronous AJAX requests (e.g. `Promise.all([updateStatus, assignUser, addComment])`).
+- Consolidate interdependent state changes (status change, assignee reassignment, audit/transition comment) into a single atomic backend route wrapped in one database transaction (`db.session.commit()`).
+- Return JSON responses (`{success: true, ...}`) for XHR/Fetch clients instead of HTML redirects.
+
+

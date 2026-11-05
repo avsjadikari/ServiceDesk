@@ -18,6 +18,9 @@
 | Version semantics inconsistent: create stores NEW content at v1, edit stores OLD content at bumped number | `routes/knowledge.py:86-93` + edit | logic inconsistency | med | S | med | **resolved 2026-10-08** — edit stores post-edit content at the bumped version (`67fc90c`) |
 | `helpful()` open to any authenticated user; edit/delete agent-only | `routes/knowledge.py:160-164` | authz inconsistency | low | S | low | **accepted 2026-10-08** — every authenticated user may mark an article helpful by design; edit/delete stays agent-only. No code change |
 | `avg_resolution_hours` garbage on SQLite (`extract('epoch', ...)` compiles to string math → constant `-58574100.0`); DB-side date math not portable | `utils.py:170-183` (surfaces `routes/analytics.py:110`) | portability bug | high (wrong analytics on SQLite) | M | high | **resolved 2026-10-08** — computed in Python from `Ticket.resolution_time` (`67fc90c`) |
+| Kanban board modal click interception: `.main-content` CSS animation creates stacking context, placing backdrop over `#statusModal` and freezing UI | `templates/tickets/board.html`, `base.html` | UI/CSS bug | high | S | high | **resolved 2026-11-05** — rendered in `{% block modals %}` outside `<main>`, attached directly to `document.body` (`d5b5b24`) |
+| Kanban split async requests: concurrent `Promise.all([updateStatus, assign, comment])` caused race conditions, comment loss, and SQLite locks | `routes/tickets.py`, `board.html` | concurrency bug | high | M | high | **resolved 2026-11-05** — consolidated into single atomic `POST /tickets/<id>/update-status` wrapped in one DB transaction (`d5b5b24`) |
+| Kanban board included closed tickets in query | `routes/tickets.py:106` | workflow bug | med | S | med | **resolved 2026-11-05** — filtered via `Ticket.status.in_(TICKET_STATUSES[:-1])` (`80b1ab8`) |
 
 ## Smell Inventory
 
@@ -34,6 +37,7 @@
 | Sniff sample length bare literal `512` | `routes/tickets.py` upload_attachment | `SNIFF_LENGTH = 512` constant | **resolved 2026-10-08** (`9140c56`) |
 | Duplicated "rejected attachment" warning-log block ×2 | `routes/tickets.py` upload_attachment | Rule of Three: extract `_log_rejected_upload(...)` on 3rd occurrence | open (tolerated at 2) |
 | Status-transition knowledge split: `_execute_automation_rule` sets `status="assigned"` unconditionally; `promote_status_if_new` promotes only when None/"new" | `app/utils.py:100` + `models.py` | Suspected behavior divergence (automation assign on an in-progress ticket re-opens it as "assigned"). Decide in Phase 7 hardening; pin with a test first | **resolved 2026-10-08** — automation assign now uses `promote_status_if_new`; pin `TestAutomationAssign` (`c6a6ae6`) |
+| Unassign logic duplication: `/api/tickets/<id>`, `/tickets/<id>/assign`, and `/tickets/<id>/update-status` duplicated unassignment, status reset to new, and audit logging | `routes/api.py`, `routes/tickets.py` | Extract `unassign_ticket(ticket)` in `app/tickets_lifecycle.py` | **resolved 2026-11-05** (`80b1ab8`) |
 | CRLF/LF mixed line endings | `tests/test_tickets.py` (pre-existing) | Normalize to LF if repo adopts a formatter | skip unless ruff added |
 
 ## Sprout / Wrap Register

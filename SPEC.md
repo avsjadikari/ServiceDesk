@@ -81,7 +81,7 @@
 | title | String(200) | Brief description |
 | description | Text | Detailed information |
 | type | Enum | incident/request/problem |
-| status | Enum | open/in_progress/pending/resolved/closed |
+| status | Enum | new/assigned/in_progress/pending/resolved/closed |
 | priority | Enum | low/medium/high/critical |
 | category | String | Issue category |
 | assigned_to | FK(User) | Assigned agent |
@@ -106,7 +106,7 @@ New → Assigned → In Progress → Pending → Resolved → Closed
 
 #### Views & Workflow Interaction
 - **Table List View**: Paginated, sortable, filterable DataTables view
-- **Kanban Workflow Board (`/tickets/board`)**: Visual 5-stage drag-and-drop board (`open`, `in_progress`, `pending`, `resolved`, `closed`) with AJAX status synchronization (`POST /tickets/<id>/update-status`) and optimistic UI updates
+- **Kanban Workflow Board (`/tickets/board`)**: Visual 5-stage drag-and-drop board (`new`, `assigned`, `in_progress`, `pending`, `resolved` — excludes `closed`) with atomic AJAX status, assignee, and comment synchronization (`POST /tickets/<id>/update-status`), modal confirmation rendered outside CSS stacking contexts (`{% block modals %}`), and optimistic UI updates with automatic rollback on error
 - **Ticket Lifecycle Stepper**: 5-step visual progress stepper on ticket detail view (`app/templates/tickets/view.html`, `app/templates/portal/view_ticket.html`)
 
 ### 4.2 Knowledge Base

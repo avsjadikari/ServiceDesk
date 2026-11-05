@@ -22,7 +22,7 @@ locality).
 
 | Term | Meaning | Home |
 |---|---|---|
-| ticket lifecycle | The create / transition / assign / annotate operations of a ticket, as one seam. Owns audit-trail wiring, notification, automation, and promote-on-assign; adapter commits. | `app/tickets_lifecycle.py` |
+| ticket lifecycle | The create / transition / assign / unassign / annotate operations of a ticket, as one seam. Owns audit-trail wiring, notification, automation, and promote-on-assign; adapter commits. | `app/tickets_lifecycle.py` |
 | ticket transition | A validated status move plus its effects: first-response/resolved/closed timestamps, audit row, notify. Entity behaviour lives on `Ticket`; orchestration in the lifecycle module. | `app/models.py` + lifecycle |
 | password change | The account operation: hash, clear `must_change_password`, reset lockout, stamp `last_password_reset_at` — one invariant, always applied together. | `User.apply_password_change()` |
 | user provisioning | Creating an account with an initial password, role, and flags. Shared by registration, admin create, setup wizard, and seed. | `User` / seed |

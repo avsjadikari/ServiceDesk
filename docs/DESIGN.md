@@ -24,7 +24,7 @@ Scored the agent submit moments (create / comment / upload / status Apply / assi
 
 | # | Fix | Status |
 |---|---|---|
-| M1 | Global submit guard in `main.js` (`initSubmitGuards`): form submit disables the button + shows spinner — kills duplicate tickets/comments/audits/emails; board modal "Save & move" disabled until `Promise.all` settles | **shipped** |
+| M1 | Global submit guard in `main.js` (`initSubmitGuards`): form submit disables the button + shows spinner — kills duplicate tickets/comments/audits/emails; board modal "Save & move" disabled with spinner until atomic status update settles | **shipped** |
 | M2 | Stepper "just moved" pulse on status change | skipped (needs prev-status plumbing) |
 | M3 | Live title/comment char counters | skipped (clutter; add if 200-char limit hit) |
 
@@ -41,11 +41,12 @@ Scored 5/10 (Quick Diagnostic: search ∅, you-are-here, undo-in-place partial, 
 | U5 | 1 | No `maxlength` on title/desc inputs (200-char limit bites post-submit) | backlog |
 
 ### Strengths (protect)
-- Board: optimistic move + confirm modal + mandatory comment + cancel/restore = correct error recovery (`board.html:292-348`).
-- Constraint present: assign picker hidden for non-"assigned" columns; assign select hidden on closed tickets.
+- Board: optimistic move + confirm modal (rendered in `{% block modals %}` outside CSS stacking contexts) + optional transition comment + cancel/restore = correct error recovery (`board.html`).
+- Constraint present: assign picker hidden for non-"assigned" columns; assign select hidden on closed tickets; closed tickets excluded from active Kanban view.
 
 ## Change Log
 
 | Date | Change |
 |---|---|
 | 2026-10-09 | K1/K4/K5/K6 shipped (269 tests green). Board confirmed as the reference interaction model. |
+| 2026-11-05 | Kanban modal moved to `{% block modals %}` to prevent backdrop freeze; transitions unified into atomic `POST /tickets/<id>/update-status`; 311 tests green. |
