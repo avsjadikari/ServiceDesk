@@ -489,6 +489,88 @@ class TestKanbanBoard:
             assert updated_ticket.status == "in_progress"
             assert updated_ticket.first_response_at is not None
 
+    def test_kanban_atomic_status_assign_and_comment(
+        self, client, app, db, admin_user, agent_user
+    ):
+        """Verify Kanban board updates status, assigns agent, and records comment in single request."""
+        from app.models import Comment
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-001001",
+                title="Atomic Kanban Test",
+                description="Test moving from new to assigned with comment",
+                created_by=admin_user.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+                status="new",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/update-status",
+                json={
+                    "status": "assigned",
+                    "assigned_to": agent_user.id,
+                    "comment": "Assigned on Kanban board to agent",
+                },
+            )
+            assert response.status_code == 200
+            data = response.get_json()
+            assert data["success"] is True
+            assert data["status"] == "assigned"
+            assert data["assigned_to"] == agent_user.id
+            assert data["assignee_name"] == agent_user.full_name
+
+            t = Ticket.query.get(ticket.id)
+            assert t.status == "assigned"
+            assert t.assigned_to == agent_user.id
+
+            comments = Comment.query.filter_by(ticket_id=ticket.id).all()
+            assert len(comments) == 1
+            assert comments[0].content == "Assigned on Kanban board to agent"
+            assert comments[0].user_id == admin_user.id
+
+    def test_kanban_all_stage_moves(self, client, app, db, admin_user, agent_user):
+        """Verify all Kanban workflow stage moves: new -> assigned -> in_progress -> pending -> resolved -> new."""
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            ticket = Ticket(
+                ticket_number="TKT-001002",
+                title="All Moves Test",
+                description="Workflow test",
+                created_by=admin_user.id,
+                type="incident",
+                priority="medium",
+                category="Software",
+                status="new",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            stages = [
+                ("assigned", agent_user.id, "Assigned"),
+                ("in_progress", agent_user.id, "Started work"),
+                ("pending", agent_user.id, "Waiting on vendor"),
+                ("resolved", agent_user.id, "Issue fixed"),
+                ("new", 0, "Reopened"),
+            ]
+
+            for next_status, aid, note in stages:
+                res = client.post(
+                    f"/tickets/{ticket.id}/update-status",
+                    json={"status": next_status, "assigned_to": aid, "comment": note},
+                )
+                assert res.status_code == 200
+                t = Ticket.query.get(ticket.id)
+                assert t.status == next_status
+                if aid == 0:
+                    assert t.assigned_to is None
+                else:
+                    assert t.assigned_to == aid
+
     def test_ticket_list_with_sla_deadlines(self, client, app, db, admin_user):
         """Test tickets index renders properly with tickets having SLA deadlines"""
         from datetime import datetime, timedelta

@@ -229,7 +229,16 @@ def edit(ticket_id):
 @web_agent_required
 def update_status(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
-    new_status = request.json.get("status") if request.is_json else request.form.get("status")
+
+    if request.is_json:
+        data = request.get_json() or {}
+        new_status = data.get("status")
+        assignee_id = data.get("assigned_to")
+        comment_content = (data.get("comment") or "").strip()
+    else:
+        new_status = request.form.get("status")
+        assignee_id = request.form.get("assigned_to")
+        comment_content = (request.form.get("comment") or "").strip()
 
     if not new_status:
         if request.is_json:
@@ -243,10 +252,37 @@ def update_status(ticket_id):
         return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
     tickets_lifecycle.change_status(ticket, new_status)
+
+    if assignee_id is not None and str(assignee_id).strip() != "":
+        try:
+            aid = int(assignee_id)
+            if aid > 0:
+                assignee = User.query.get(aid)
+                if assignee and assignee.is_active and assignee.is_agent():
+                    tickets_lifecycle.assign_ticket(ticket, aid)
+            elif aid == 0:
+                tickets_lifecycle.unassign_ticket(ticket)
+        except (ValueError, TypeError):
+            pass
+
+    if comment_content:
+        tickets_lifecycle.add_comment(
+            ticket,
+            comment_content,
+            is_internal=False,
+            user_id=current_user.id,
+        )
+
     db.session.commit()
 
     if request.is_json:
-        return jsonify({"success": True, "ticket_id": ticket.id, "status": new_status})
+        return jsonify({
+            "success": True,
+            "ticket_id": ticket.id,
+            "status": ticket.status,
+            "assigned_to": ticket.assigned_to,
+            "assignee_name": ticket.assignee.full_name if ticket.assignee else None,
+        })
 
     flash(f"Ticket status updated to {STATUS_LABELS.get(new_status, new_status)}.", "success")
 
