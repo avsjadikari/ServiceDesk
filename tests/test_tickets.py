@@ -252,6 +252,66 @@ class TestTicketAssignment:
             assert ticket.assigned_to == agent_user.id
             assert ticket.status == "assigned"
 
+    def test_unassign_ticket_clears_assignee_and_logs_audit(
+        self, client, app, db, admin_user, agent_user
+    ):
+        """Test unassigning a ticket via /tickets/<id>/assign with empty assigned_to
+        clears assignee, resets assigned status to new, and creates an audit record."""
+        from app.models import AuditLog
+
+        with app.app_context():
+            client.post(
+                "/login", data={"username": "admin", "password": "Admin@123456"}
+            )
+
+            ticket = Ticket(
+                ticket_number="TKT-000006",
+                title="Assigned Ticket",
+                description="Test description",
+                created_by=admin_user.id,
+                assigned_to=agent_user.id,
+                status="assigned",
+                type="incident",
+                priority="high",
+                category="Hardware",
+            )
+            db.session.add(ticket)
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/assign",
+                data={"assigned_to": ""},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            assert b"Ticket unassigned." in response.data
+
+            ticket = Ticket.query.get(ticket.id)
+            assert ticket.assigned_to is None
+            assert ticket.status == "new"
+
+            audit = AuditLog.query.filter_by(
+                action="unassign", entity_id=ticket.id
+            ).first()
+            assert audit is not None
+            assert audit.entity_type == "ticket"
+            assert audit.details == {"assigned_to": None}
+
+            # If ticket was in_progress, unassigning leaves workflow state intact
+            ticket.assigned_to = agent_user.id
+            ticket.status = "in_progress"
+            db.session.commit()
+
+            response = client.post(
+                f"/tickets/{ticket.id}/assign",
+                data={"assigned_to": "0"},
+                follow_redirects=True,
+            )
+            assert response.status_code == 200
+            ticket = Ticket.query.get(ticket.id)
+            assert ticket.assigned_to is None
+            assert ticket.status == "in_progress"
+
     def test_assign_ticket_to_regular_user_rejected(
         self, client, app, db, admin_user, regular_user
     ):
@@ -365,6 +425,40 @@ class TestKanbanBoard:
             client.post("/login", data={"username": "user", "password": "User@123456"})
             response = client.get("/tickets/board")
             assert response.status_code == 403
+
+    def test_kanban_board_excludes_closed_tickets(
+        self, client, app, db, admin_user
+    ):
+        """Verify Kanban board query filters out closed tickets."""
+        with app.app_context():
+            client.post("/login", data={"username": "admin", "password": "Admin@123456"})
+            open_ticket = Ticket(
+                ticket_number="TKT-000097",
+                title="Active Ticket Kanban",
+                description="Visible",
+                created_by=admin_user.id,
+                type="incident",
+                priority="high",
+                category="Hardware",
+                status="new",
+            )
+            closed_ticket = Ticket(
+                ticket_number="TKT-000098",
+                title="Closed Ticket Kanban",
+                description="Hidden",
+                created_by=admin_user.id,
+                type="incident",
+                priority="low",
+                category="Hardware",
+                status="closed",
+            )
+            db.session.add_all([open_ticket, closed_ticket])
+            db.session.commit()
+
+            response = client.get("/tickets/board")
+            assert response.status_code == 200
+            assert b"Active Ticket Kanban" in response.data
+            assert b"Closed Ticket Kanban" not in response.data
 
     def test_kanban_json_status_update(self, client, app, db, admin_user):
         with app.app_context():

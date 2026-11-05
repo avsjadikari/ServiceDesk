@@ -187,13 +187,7 @@ def update_ticket(ticket_id):
     if "assigned_to" in data:
         assignee_id = data["assigned_to"]
         if assignee_id is None:
-            if ticket.assigned_to is not None:
-                ticket.assigned_to = None
-                if ticket.status in (None, "new", "assigned"):
-                    ticket.status = "new"
-                log_ticket_audit(
-                    ticket, "unassign", {"assigned_to": None}, commit=False
-                )
+            tickets_lifecycle.unassign_ticket(ticket)
         else:
             try:
                 assignee_id = int(assignee_id)

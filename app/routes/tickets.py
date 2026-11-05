@@ -103,7 +103,11 @@ def index():
 @login_required
 @web_agent_required
 def board():
-    tickets = Ticket.query.order_by(Ticket.created_at.desc()).all()
+    tickets = (
+        Ticket.query.filter(Ticket.status.in_(TICKET_STATUSES[:-1]))
+        .order_by(Ticket.created_at.desc())
+        .all()
+    )
     # Board shows every status except "closed".
     columns = {
         status: [t for t in tickets if t.status == status]
@@ -256,28 +260,33 @@ def assign(ticket_id):
     ticket = Ticket.query.get_or_404(ticket_id)
     assignee_id = request.form.get("assigned_to")
 
-    if assignee_id:
-        try:
-            assignee_id = int(assignee_id)
-        except (TypeError, ValueError):
-            flash("Invalid assignee.", "danger")
-            return redirect(url_for("tickets.view", ticket_id=ticket_id))
-
-        assignee = User.query.get(assignee_id)
-        if assignee is None or not assignee.is_active:
-            flash("Assignee does not exist.", "danger")
-            return redirect(url_for("tickets.view", ticket_id=ticket_id))
-        if not assignee.is_agent():
-            flash("Assignee must be an agent or admin.", "danger")
-            return redirect(url_for("tickets.view", ticket_id=ticket_id))
-
-        tickets_lifecycle.assign_ticket(ticket, assignee_id)
+    if not assignee_id or assignee_id.strip() in ("", "0"):
+        tickets_lifecycle.unassign_ticket(ticket)
         db.session.commit()
+        flash("Ticket unassigned.", "success")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
 
-        flash(
-            f"Ticket assigned to {ticket.assignee.full_name if ticket.assignee else 'Unknown'}.",
-            "success",
-        )
+    try:
+        assignee_id = int(assignee_id)
+    except (TypeError, ValueError):
+        flash("Invalid assignee.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    assignee = User.query.get(assignee_id)
+    if assignee is None or not assignee.is_active:
+        flash("Assignee does not exist.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+    if not assignee.is_agent():
+        flash("Assignee must be an agent or admin.", "danger")
+        return redirect(url_for("tickets.view", ticket_id=ticket_id))
+
+    tickets_lifecycle.assign_ticket(ticket, assignee_id)
+    db.session.commit()
+
+    flash(
+        f"Ticket assigned to {ticket.assignee.full_name if ticket.assignee else 'Unknown'}.",
+        "success",
+    )
 
     return redirect(url_for("tickets.view", ticket_id=ticket_id))
 

@@ -72,6 +72,21 @@ def assign_ticket(ticket: Ticket, assignee_id: int) -> Ticket:
     return ticket
 
 
+def unassign_ticket(ticket: Ticket) -> Ticket:
+    """Unassign an agent, reset status to new if was new/assigned, and audit."""
+    had_assignee = ticket.assigned_to is not None
+    ticket.assigned_to = None
+    if ticket.status in (None, "new", "assigned"):
+        ticket.status = "new"
+    db.session.flush()
+
+    if had_assignee:
+        log_ticket_audit(
+            ticket, "unassign", {"assigned_to": None}, commit=False
+        )
+    return ticket
+
+
 def add_comment(
     ticket: Ticket, content: str, is_internal: bool, user_id: int
 ) -> Comment:
