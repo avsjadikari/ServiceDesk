@@ -396,10 +396,9 @@ def get_users():
     query = User.query
     is_active_arg = request.args.get("is_active")
     if is_active_arg is not None:
-        if is_active_arg.lower() in ("true", "1"):
-            query = query.filter_by(is_active=True)
-        elif is_active_arg.lower() in ("false", "0"):
-            query = query.filter_by(is_active=False)
+        val = is_active_arg.lower()
+        if val in ("true", "1", "false", "0"):
+            query = query.filter_by(is_active=val in ("true", "1"))
         else:
             return jsonify(
                 {"error": "Invalid is_active value. Must be true, false, 1, or 0"}
